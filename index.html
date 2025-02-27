@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>Pyramid</title>
+    <link rel="stylesheet" type="text/css" href="css/pyramid.css">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <div id="auth-container">
+        <div id="g_id_signin"></div> <!-- Google renderiza aquí el botón -->
+    </div>
+
+    <div id="options" style="display: none;">
+        <a href="admin.html">
+            <button>Administrar</button>
+        </a>
+        <a href="player.html">
+            <button>Jugar</button>
+        </a>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="js/sauth.js"></script>
+</body>
+
+</html>
