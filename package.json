@@ -1,5 +1,16 @@
 {
+  "name": "stars-hunters",
+  "version": "1.0.0",
+  "description": "Juego de construcción de pirámides",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "tsc && echo 'Archivos compilados. Abre http://localhost/Practiques/M12-Projecte/StarsHunters/index.html en tu navegador'"
+  },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.5"
   }
 }

@@ -1,0 +1,9 @@
+# Configuración para archivos JavaScript module
+AddType application/javascript .js
+AddType application/json .json
+
+# Habilitar el módulo headers si es necesario
+<IfModule mod_headers.c>
+    # Permitir CORS para desarrollo local
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>
