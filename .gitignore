@@ -1,0 +1,20 @@
+# VSCode settings
+.vscode/
+
+# Node modules (if your project uses Node.js)
+node_modules/
+
+# Logs
+*.log
+
+# Build directories
+dist/
+build/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.cache
