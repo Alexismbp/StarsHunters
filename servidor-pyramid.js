@@ -162,6 +162,7 @@ let gameInterval = null;
 let adminWs = null;
 let pedres = [];
 let punts = [0, 0];
+let idEstrella = 1; // ID para las estrellas, incrementa con cada nueva estrella
 
 console.log("Servidor WebSocket escoltant al port 8180");
 // Esdeveniment del servidor 'wss' per gestionar la connexió d'un client 'ws'
@@ -228,6 +229,14 @@ function processar(ws, m) {
         break;
       case "agafar":
         agafar(ws, m);
+        break;
+      case "starCollision":
+        // Manejar colisión con estrella
+        const colisionData = JSON.parse(m);
+        manejarColisionEstrella(
+          colisionData.jugadorId,
+          colisionData.estrellaId
+        );
         break;
       default:
         console.log("❌ Tipus de missatge desconegut:", data.type);
@@ -310,13 +319,14 @@ function crearJugador(ws, m) {
   // Asignar equip basat en el nombre de jugadors
   const team = team0Count <= team1Count ? 0 : 1;
 
-  // Crear un jugador amb posició inicial
+  // Crear un jugador con posición inicial y puntuación inicial
   players[playerId] = {
     id: playerId,
     ws: ws,
     x: team === 0 ? 0 : config.width - MIDAJ,
     y: team === 0 ? 0 : config.height - MIDAJ,
     team: team,
+    puntuacion: 0, // Inicializar la puntuación a 0
   };
 
   // Enviar identificador i configuració
@@ -337,11 +347,9 @@ function crearJugador(ws, m) {
 //	segons l'equip, a intervals regulars
 // Posar els punts dels dos equips a 0
 function reiniciar() {
-  pedres = [];
-  punts = [0, 0];
-
-  // Reiniciar posicions dels jugadors
+  // Resetear las puntuaciones de todos los jugadores
   Object.values(players).forEach((jugador) => {
+    jugador.puntuacion = 0;
     if (jugador.team === 0) {
       jugador.x = 0;
       jugador.y = 0;
@@ -351,6 +359,9 @@ function reiniciar() {
     }
     delete jugador.stone;
   });
+
+  // Reiniciar las estrellas
+  inicializarEstrellas();
 
   enviarEstatJoc();
 }
@@ -457,6 +468,7 @@ function start(ws, m) {
   // Iniciar el joc
   gameRunning = true;
   reiniciar(); // Reiniciar l'estat del joc
+  inicializarEstrellas(); // Inicializar las estrellas
 
   // Iniciar el temporitzador que crida a mou()
   gameInterval = setInterval(mou, TEMPS);
@@ -640,59 +652,22 @@ function mou() {
       player.stone.x = player.x;
       player.stone.y = player.y;
     }
+
+    // Comprobar colisiones con estrellas
+    pedres.forEach((estrella) => {
+      if (detectarColision(player, estrella)) {
+        manejarColisionEstrella(player.id, estrella.id);
+      }
+    });
   });
 
-  // Afegir pedres si no s'ha arribat al màxim
-  if (pedres.length < MAXPED) {
-    const novaPedra = {
-      x: Math.floor(Math.random() * (config.width - MIDAP)),
-      y: Math.floor(Math.random() * (config.height - MIDAP)),
-    };
-
-    // Evitar que la pedra quedi dins de les zones de construcció
-    if (!isInPyramidZone(novaPedra.x, novaPedra.y)) {
-      pedres.push(novaPedra);
-    }
+  // Garantizar que siempre haya MAXPED estrellas
+  while (pedres.length < MAXPED) {
+    pedres.push(generarEstrella());
   }
 
   // Enviar l'estat del joc a tots els clients
   enviarEstatJoc();
-}
-
-function processar(ws, missatge) {
-  try {
-    const data = JSON.parse(missatge);
-    console.log("📩 Missatge rebut:", data);
-
-    switch (data.type) {
-      // Processar missatges segons el tipus
-      case "admin":
-        crearAdmin(ws, missatge);
-        break;
-      case "player":
-        crearJugador(ws, missatge);
-        break;
-      case "config":
-        configurar(ws, missatge);
-        break;
-      case "start":
-        start(ws, missatge);
-        break;
-      case "stop":
-        stop(ws, missatge);
-        break;
-      case "direccio":
-        direccio(ws, missatge);
-        break;
-      case "agafar":
-        agafar(ws, missatge);
-        break;
-      default:
-        console.log("❌ Tipus de missatge desconegut:", data.type);
-    }
-  } catch (error) {
-    console.error("❌ Error processant missatge:", error);
-  }
 }
 
 // Si esta en la zona de la piràmide
@@ -731,6 +706,107 @@ function enviarEstatJoc() {
     }
   });
 }
-/***********************************************
- * FINAL DE L'APARTAT ON POTS FER MODIFICACIONS *
- ***********************************************/
+
+// Añadir función para detectar colisiones entre jugadores y estrellas
+function detectarColision(jugador, estrella) {
+  // Obtener las coordenadas del centro de la nave y la estrella
+  const naveCentroX = jugador.x + MIDAJ / 2;
+  const naveCentroY = jugador.y + MIDAJ / 2;
+  const estrellaCentroX = estrella.x + MIDAP / 2;
+  const estrellaCentroY = estrella.y + MIDAP / 2;
+
+  // Calcular distancia entre los centros
+  const distancia = Math.sqrt(
+    Math.pow(naveCentroX - estrellaCentroX, 2) +
+      Math.pow(naveCentroY - estrellaCentroY, 2)
+  );
+
+  // Si la distancia es menor que la suma de los radios, hay colisión
+  return distancia < (MIDAJ + MIDAP) * 0.4; // Factor 0.4 para hacer la colisión más precisa
+}
+
+// Función para generar una nueva estrella en posición aleatoria
+function generarEstrella() {
+  const margen = MIDAP * 2; // Margen para evitar estrellas en los bordes
+
+  // Generar posición aleatoria
+  const x = margen + Math.random() * (config.width - margen * 2);
+  const y = margen + Math.random() * (config.height - margen * 2);
+
+  // Asignar un ID único a la estrella
+  const id = idEstrella++;
+
+  // Crear y devolver la nueva estrella
+  return { x, y, id };
+}
+
+// Función para inicializar estrellas al comienzo del juego
+function inicializarEstrellas() {
+  pedres = []; // Limpiar estrellas existentes
+
+  // Generar un número inicial de estrellas (MAXPED)
+  for (let i = 0; i < MAXPED; i++) {
+    pedres.push(generarEstrella());
+  }
+}
+
+// Función para manejar la colisión de un jugador con una estrella
+function manejarColisionEstrella(jugadorId, estrellaId) {
+  // Verificar que el jugador existe
+  const jugador = players[jugadorId];
+  if (!jugador) return false;
+
+  // Buscar la estrella
+  const estrellaIndex = pedres.findIndex((e) => e.id === estrellaId);
+  if (estrellaIndex === -1) return false; // La estrella no existe
+
+  // Verificar la colisión
+  const estrella = pedres[estrellaIndex];
+  if (detectarColision(jugador, estrella)) {
+    // Incrementar la puntuación del jugador
+    if (!jugador.puntuacion) jugador.puntuacion = 0;
+    jugador.puntuacion++;
+
+    // Eliminar la estrella
+    pedres.splice(estrellaIndex, 1);
+
+    // Generar una nueva estrella
+    pedres.push(generarEstrella());
+
+    // Enviar un mensaje a todos los clientes
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(
+          JSON.stringify({
+            type: "starCollision",
+            jugadorId: jugadorId,
+            estrellaId: estrellaId,
+            nuevaPuntuacion: jugador.puntuacion,
+          })
+        );
+      }
+    });
+
+    // Comprobar si el jugador ha ganado
+    if (jugador.puntuacion >= config.scoreLimit) {
+      // Enviar mensaje de ganador
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(
+            JSON.stringify({
+              type: "ganador",
+              id: jugadorId,
+            })
+          );
+        }
+      });
+
+      // Detener el juego
+      stop(adminWs, null);
+    }
+
+    return true;
+  }
+
+  return false;
+}

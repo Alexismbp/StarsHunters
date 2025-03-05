@@ -176,8 +176,8 @@ function mostrarPuntuaciones(jugadores) {
         scoreDisplay.appendChild(playerScore);
     });
 }
-// Añadir función para mostrar efecto cuando un jugador recoge una estrella
-function mostrarEfectoRecoleccion(x, y) {
+// Mejorar función para mostrar efecto cuando un jugador recoge una estrella
+export function mostrarEfectoRecoleccion(x, y) {
     const svg = document.querySelector("svg");
     // Crear grupo para el efecto si no existe
     let effectsGroup = svg.getElementById("effects");
@@ -186,34 +186,72 @@ function mostrarEfectoRecoleccion(x, y) {
         effectsGroup.setAttribute("id", "effects");
         svg.appendChild(effectsGroup);
     }
-    // Crear círculo que se expande y desaparece
-    const circle = document.createElementNS(svgNS, "circle");
-    circle.setAttribute("cx", (x + MIDAP / 2).toString());
-    circle.setAttribute("cy", (y + MIDAP / 2).toString());
-    circle.setAttribute("r", "1");
-    circle.setAttribute("fill", "rgba(255, 255, 0, 0.7)");
-    circle.setAttribute("stroke", "#ffffff");
-    circle.setAttribute("stroke-width", "1");
-    effectsGroup.appendChild(circle);
-    // Animar el círculo
-    let radius = 1;
-    let opacity = 0.7;
-    const animation = setInterval(() => {
-        radius += 2;
+    // Crear un resplandor alrededor de la estrella que desaparece
+    const glow = document.createElementNS(svgNS, "circle");
+    glow.setAttribute("cx", (x + MIDAP / 2).toString());
+    glow.setAttribute("cy", (y + MIDAP / 2).toString());
+    glow.setAttribute("r", MIDAP.toString());
+    glow.setAttribute("fill", "rgba(255, 255, 0, 0.5)");
+    glow.setAttribute("filter", "blur(5px)");
+    effectsGroup.appendChild(glow);
+    // Crear partículas que se dispersen
+    for (let i = 0; i < 8; i++) {
+        const particle = document.createElementNS(svgNS, "circle");
+        particle.setAttribute("cx", (x + MIDAP / 2).toString());
+        particle.setAttribute("cy", (y + MIDAP / 2).toString());
+        particle.setAttribute("r", "2");
+        particle.setAttribute("fill", "#ffff00");
+        effectsGroup.appendChild(particle);
+        // Dirección aleatoria para cada partícula
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 2;
+        let particleX = parseFloat((x + MIDAP / 2).toString());
+        let particleY = parseFloat((y + MIDAP / 2).toString());
+        // Animar partícula
+        const particleAnim = setInterval(() => {
+            particleX += Math.cos(angle) * speed;
+            particleY += Math.sin(angle) * speed;
+            particle.setAttribute("cx", particleX.toString());
+            particle.setAttribute("cy", particleY.toString());
+            // Desvanecer partícula
+            const opacity = parseFloat(particle.getAttribute("opacity") || "1.0") - 0.05;
+            if (opacity <= 0) {
+                clearInterval(particleAnim);
+                effectsGroup?.removeChild(particle);
+            }
+            else {
+                particle.setAttribute("opacity", opacity.toString());
+            }
+        }, 50);
+    }
+    // Animar el resplandor
+    let opacity = 0.5;
+    const glowAnim = setInterval(() => {
         opacity -= 0.05;
-        if (radius > 30 || opacity <= 0) {
-            clearInterval(animation);
-            effectsGroup?.removeChild(circle);
+        if (opacity <= 0) {
+            clearInterval(glowAnim);
+            if (effectsGroup && effectsGroup.contains(glow)) {
+                effectsGroup.removeChild(glow);
+            }
         }
         else {
-            circle.setAttribute("r", radius.toString());
-            circle.setAttribute("fill", `rgba(255, 255, 0, ${opacity})`);
-            circle.setAttribute("opacity", opacity.toString());
+            glow.setAttribute("opacity", opacity.toString());
         }
     }, 50);
+    // Añadir efecto de sonido
+    try {
+        const audio = new Audio("sound/star.mp3");
+        audio.volume = 0.5;
+        audio.play();
+    }
+    catch (error) {
+        console.log("No se pudo reproducir el sonido");
+    }
 }
-// Función para detectar colisión entre nave y estrella
+// Función más robusta para detectar colisión entre nave y estrella
 export function detectarColision(jugador, estrella) {
+    if (!jugador || !estrella)
+        return false;
     // Obtener las coordenadas del centro de la nave y la estrella
     const naveCentroX = jugador.x + MIDAJ / 2;
     const naveCentroY = jugador.y + MIDAJ / 2;
@@ -223,8 +261,8 @@ export function detectarColision(jugador, estrella) {
     const distancia = Math.sqrt(Math.pow(naveCentroX - estrellaCentroX, 2) +
         Math.pow(naveCentroY - estrellaCentroY, 2));
     // Si la distancia es menor que la suma de los radios, hay colisión
-    // Usamos la mitad de la suma para ser más permisivos
-    return distancia < (MIDAJ + MIDAP) / 2;
+    // Ajustamos para hacer la colisión más permisiva
+    return distancia < (MIDAJ + MIDAP) * 0.4; // Factor 0.4 para hacer la colisión más precisa
 }
 // Dibujar jugadores, estrellas y puntuación
 export function dibuixar(jugadors, pedres) {

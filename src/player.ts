@@ -9,6 +9,7 @@ import {
   dibuixar,
   setId,
   detectarColision, // Añadimos la importación de detectarColision
+  mostrarEfectoRecoleccion, // Importamos también la función de efectos
 } from "./pyramid.js";
 
 // Interfaces para mensajes
@@ -90,6 +91,10 @@ const keysPressed: { [key: string]: boolean } = {
   left: false,
   right: false,
 };
+
+// Añadimos un conjunto para rastrear las estrellas con las que hemos colisionado
+// para evitar enviar múltiples eventos para la misma colisión
+const colisionesEstrellas = new Set<number>();
 
 /*************************************************
  * EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
@@ -365,7 +370,6 @@ function init(): void {
           break;
 
         case "dibuixar":
-          // Dibuixa jugadors i pedres
           const drawMsg = message as DrawMessage;
           console.log("🎨 Actualitzant estat del joc:", {
             jugadors: drawMsg.jugadors?.length || 0,
@@ -376,18 +380,59 @@ function init(): void {
           dibuixar(drawMsg.jugadors || [], drawMsg.pedres || []);
 
           // Comprobar si hay colisiones entre la nave del jugador actual y alguna estrella
-          // Nota: Esto normalmente lo haría el servidor, pero podemos hacer una comprobación extra en el cliente
           if (playerId !== null) {
             const jugadorActual = drawMsg.jugadors?.find(
               (j) => j.id === playerId
             );
             if (jugadorActual) {
               drawMsg.pedres?.forEach((estrella) => {
-                if (detectarColision(jugadorActual, estrella)) {
-                  console.log("Posible colisión detectada con estrella");
+                if (
+                  estrella.id !== undefined &&
+                  detectarColision(jugadorActual, estrella)
+                ) {
+                  // Solo enviar un mensaje de colisión si no hemos colisionado ya con esta estrella
+                  if (!colisionesEstrellas.has(estrella.id)) {
+                    console.log(
+                      `Colisión detectada con estrella ${estrella.id}`
+                    );
+
+                    // Almacenar esta colisión para evitar duplicados
+                    colisionesEstrellas.add(estrella.id);
+
+                    // Enviar mensaje de colisión al servidor
+                    // El servidor debe eliminar esta estrella y crear una nueva
+                    ws!.send(
+                      JSON.stringify({
+                        type: "starCollision",
+                        jugadorId: playerId,
+                        estrellaId: estrella.id,
+                      })
+                    );
+
+                    // Mostrar efecto visual de recolección
+                    mostrarEfectoRecoleccion(estrella.x, estrella.y);
+                  }
                 }
               });
             }
+          }
+
+          // Limpiamos el conjunto de colisiones para las estrellas que ya no existen
+          // Esto evita que el conjunto crezca indefinidamente
+          if (drawMsg.pedres) {
+            const estrellasActualesIds = new Set<number>();
+            drawMsg.pedres.forEach((p) => {
+              if (p.id !== undefined) {
+                estrellasActualesIds.add(p.id);
+              }
+            });
+
+            // Eliminar IDs de estrellas que ya no existen en el juego
+            colisionesEstrellas.forEach((id) => {
+              if (!estrellasActualesIds.has(id)) {
+                colisionesEstrellas.delete(id);
+              }
+            });
           }
           break;
 
@@ -427,12 +472,27 @@ function init(): void {
             `⭐ Jugador ${starMsg.jugadorId} ha recogido una estrella. Nueva puntuación: ${starMsg.nuevaPuntuacion}`
           );
 
-          // Si somos nosotros, mostrar un mensaje en la consola
+          // Si somos nosotros, mostrar un mensaje más destacado
           if (playerId === starMsg.jugadorId) {
-            console.log("¡Has recogido una estrella! +1 punto");
+            console.log(
+              "%c¡Has recogido una estrella! +1 punto",
+              "color: yellow; background-color: black; font-size: 16px; padding: 5px;"
+            );
           }
 
-          // La actualización visual se manejará en el siguiente mensaje dibuixar
+          // Buscar la estrella con la que colisionamos para mostrar un efecto aunque no seamos nosotros
+          // Esto es importante para visualizar correctamente cuando otros jugadores recogen estrellas
+          const estrella = document.getElementById(
+            `estrella-${starMsg.estrellaId}`
+          );
+          if (estrella) {
+            // Extraer las coordenadas para el efecto
+            const x = parseFloat(estrella.getAttribute("x") || "0");
+            const y = parseFloat(estrella.getAttribute("y") || "0");
+
+            // Mostrar animación de recolección
+            mostrarEfectoRecoleccion(x, y);
+          }
           break;
 
         default:
