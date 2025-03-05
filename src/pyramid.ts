@@ -50,9 +50,6 @@ const NAU_ENEMIGA: string = "img/nau4.svg"; // Nave del enemigo
 // Ruta a la imagen de la estrella
 const ESTRELLA: string = "img/estrella.svg"; // Imagen de estrella para recolectar
 
-// Orientación base de las imágenes de naves
-const NAU_BASE_ANGLE: number = 0; // La nave sin rotar mira hacia arriba por defecto
-
 let connexio: any;
 // Inicializamos config con valores predeterminados
 let config: Config = {
@@ -119,8 +116,13 @@ function imageSVG(
   // Normalizar el ángulo de entrada a un valor entre 0-359
   angle = ((angle % 360) + 360) % 360;
 
+  // Verificar si es una nave (no es una estrella)
+  const isNave = src === NAU_PROPIA || src === NAU_ENEMIGA;
+
   // Aplicar la transformación de rotación
-  if (angle !== 0) {
+  if (angle !== 0 || isNave) {
+    // Para naves, aseguramos que la orientación sea correcta
+    // El ángulo ya viene calculado correctamente desde Player.ts
     const transform = `rotate(${angle} ${centerX} ${centerY})`;
     img.setAttributeNS(null, "transform", transform);
   }

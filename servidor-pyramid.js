@@ -610,6 +610,11 @@ function direccio(ws, m) {
         break;
     }
 
+    // Guardar el ángulo recibido del cliente
+    if (data.angle !== undefined) {
+      player.angle = data.angle;
+    }
+
     // Comprovar que no surt de la zona de joc
     if (
       newX >= 0 &&

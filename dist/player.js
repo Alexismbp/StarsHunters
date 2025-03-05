@@ -30,23 +30,23 @@ const colisionesEstrellas = new Set();
 function getAngleFromDirection() {
     // Movimiento diagonal
     if (keysPressed.up && keysPressed.right)
-        return 45;
-    if (keysPressed.down && keysPressed.right)
-        return 135;
-    if (keysPressed.down && keysPressed.left)
         return 225;
-    if (keysPressed.up && keysPressed.left)
+    if (keysPressed.down && keysPressed.right)
         return 315;
+    if (keysPressed.down && keysPressed.left)
+        return 45;
+    if (keysPressed.up && keysPressed.left)
+        return 135;
     // Movimiento simple
     if (keysPressed.up)
-        return 0;
-    if (keysPressed.right)
-        return 90;
-    if (keysPressed.down)
         return 180;
-    if (keysPressed.left)
+    if (keysPressed.right)
         return 270;
-    // Si no hay movimiento, mantener el último ángulo
+    if (keysPressed.down)
+        return 0;
+    if (keysPressed.left)
+        return 90;
+    // Si no hay movimiento, mantener el último ángulo conocido
     return currentAngle;
 }
 // Calcular la dirección principal basada en las teclas presionadas
@@ -88,11 +88,12 @@ function sendDirection(direction) {
     }
     // Actualizar el ángulo actual según las teclas presionadas
     currentAngle = getAngleFromDirection();
+    // Siempre enviar el ángulo actualizado junto con la dirección
     ws.send(JSON.stringify({
         type: "direccio",
         id: playerId,
         direction: direction,
-        angle: currentAngle, // Enviamos el ángulo junto con la dirección
+        angle: currentAngle,
     }));
 }
 // Actualiza el movimiento basado en el estado actual de las teclas
