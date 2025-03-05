@@ -8,6 +8,7 @@ export type Jugador = {
   team: 0 | 1;
   hasPedra?: boolean;
   color?: string; // Añadir color como opcional para compatibilidad con otros archivos
+  angle?: number; // Ángulo de rotación en grados (0 = hacia arriba, 90 = derecha, etc.)
 };
 
 export type Pedra = {
@@ -45,9 +46,12 @@ const palmtree =
 // Factor d'escala
 const ESCALA: number = 4;
 
-// Mida del jugador i pedra
-const MIDAJ: number = 4 * ESCALA;
-const MIDAP: number = 2 * ESCALA;
+// Margen de seguridad para la aparición de naves (distancia adicional desde los bordes)
+const MARGEN_SEGURIDAD: number = 20 * ESCALA;
+
+// Mida del jugador i pedra - aumentamos tamaño
+const MIDAJ: number = 8 * ESCALA; // Duplicado de 4*ESCALA a 8*ESCALA para naves más grandes
+const MIDAP: number = 4 * ESCALA; // Duplicado de 2*ESCALA a 4*ESCALA para estrellas más grandes
 
 // Mida de l'àrea de joc i piràmide
 const PH: number = 4 * ESCALA;
@@ -61,6 +65,17 @@ const COLOR_PYRA: [string, string] = ["#fff0f0", "#f0fff0"];
 const COLOR_GRP: [string, string] = ["#ff0000", "#00ff00"];
 const COLOR_PLY: [string, string] = ["#800000", "#008000"];
 const COLOR_STN: string = "#a0a000";
+
+// Ruta a las imágenes de las naves
+const NAU_PROPIA: string = "img/nau3.svg"; // Nave del jugador actual
+const NAU_ENEMIGA: string = "img/nau4.svg"; // Nave del enemigo
+// Ruta a la imagen de la estrella
+const ESTRELLA: string = "img/estrella.svg"; // Imagen de estrella para recolectar
+
+// Orientación base de las imágenes de naves
+// Indica hacia dónde apunta la nave cuando el ángulo es 0 (sin rotación)
+// 0 = arriba, 90 = derecha, 180 = abajo, 270 = izquierda
+const NAU_BASE_ANGLE: number = 0; // La nave sin rotar mira hacia arriba por defecto
 
 let connexio: any;
 // Inicializamos config con valores predeterminados para evitar error TS2739
@@ -122,6 +137,77 @@ function rectangleSVG(
   r.setAttributeNS(null, "fill", color);
 
   return r;
+}
+
+// Función específica para crear y rotar las naves
+function createShipImage(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  src: string,
+  angle: number = 0
+): SVGImageElement {
+  const img = document.createElementNS(svgNS, "image");
+
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+
+  img.setAttributeNS(null, "x", x.toString());
+  img.setAttributeNS(null, "y", y.toString());
+  img.setAttributeNS(null, "width", width.toString());
+  img.setAttributeNS(null, "height", height.toString());
+  img.setAttributeNS("http://www.w3.org/1999/xlink", "href", src);
+
+  // Normalizar primero el ángulo de entrada a un valor entre 0-359
+  angle = ((angle % 360) + 360) % 360;
+
+  // Calcular la rotación final considerando la orientación base de la imagen
+  // Si NAU_BASE_ANGLE es 0, esto no cambia nada
+  // Si NAU_BASE_ANGLE es diferente, ajusta la rotación para compensar
+  let rotationAngle = angle;
+
+  // Aplicar la transformación de rotación
+  if (rotationAngle !== 0) {
+    const transform = `rotate(${rotationAngle} ${centerX} ${centerY})`;
+    img.setAttributeNS(null, "transform", transform);
+  }
+
+  return img;
+}
+
+// Crear una imagen SVG para representar las naves con rotación
+function imageSVG(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  src: string,
+  angle: number = 0
+): SVGImageElement {
+  // Si es una nave, usar la función especializada
+  if (src === NAU_PROPIA || src === NAU_ENEMIGA) {
+    return createShipImage(x, y, width, height, src, angle);
+  }
+
+  // Para otros elementos (como estrellas)
+  const img = document.createElementNS(svgNS, "image");
+
+  img.setAttributeNS(null, "x", x.toString());
+  img.setAttributeNS(null, "y", y.toString());
+  img.setAttributeNS(null, "width", width.toString());
+  img.setAttributeNS(null, "height", height.toString());
+  img.setAttributeNS("http://www.w3.org/1999/xlink", "href", src);
+
+  // Aplicar rotación simple si es necesario
+  if (angle !== 0) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const transform = `rotate(${angle} ${centerX} ${centerY})`;
+    img.setAttributeNS(null, "transform", transform);
+  }
+
+  return img;
 }
 
 // Afegir la zona per construir la piràmide d'un equip
@@ -229,7 +315,7 @@ export function dibuixar(
 ): void {
   initializeSvgStructure();
 
-  let c: string;
+  let naveSrc: string;
   const svg = document.querySelector("svg") as SVGSVGElement;
   if (!svg) {
     console.error("Error: No se encontró el elemento SVG");
@@ -246,10 +332,18 @@ export function dibuixar(
   while (ply.firstChild) ply.removeChild(ply.firstChild);
 
   for (const j of jugadors) {
-    if (id !== undefined && id === j.id) c = COLOR_PLY[j.team];
-    else c = COLOR_GRP[j.team];
+    // Decidir qué imagen usar: nau3.png para el jugador actual, nau4.png para enemigos
+    if (id !== undefined && id === j.id) {
+      naveSrc = NAU_PROPIA; // Nave del jugador actual (nau3.png)
+    } else {
+      naveSrc = NAU_ENEMIGA; // Nave del enemigo (nau4.png)
+    }
 
-    ply.appendChild(rectangleSVG(j.x, j.y, MIDAJ, MIDAJ, c));
+    // Definir el ángulo de rotación (0 por defecto si no está especificado)
+    const angle = j.angle || 0;
+
+    // Usar imageSVG con el ángulo de rotación para representar a los jugadores
+    ply.appendChild(imageSVG(j.x, j.y, MIDAJ, MIDAJ, naveSrc, angle));
   }
 
   // Eliminar i redibuixar les pedretes
@@ -262,7 +356,8 @@ export function dibuixar(
   while (stn.firstChild) stn.removeChild(stn.firstChild);
 
   for (const p of pedres) {
-    stn.appendChild(rectangleSVG(p.x, p.y, MIDAP, MIDAP, COLOR_STN));
+    // Usar imágenes SVG de estrellas en lugar de rectángulos
+    stn.appendChild(imageSVG(p.x, p.y, MIDAP, MIDAP, ESTRELLA));
   }
 
   // Dibuixar les piràmides de cada equip
@@ -313,6 +408,26 @@ export function configurar(c: Config): void {
 // Añadir una función para exponer el ID al exterior
 export function setId(newId: string | number): void {
   id = newId;
+}
+
+// Exportar una función para obtener las coordenadas centrales de cada base
+export function getBaseCenter(team: 0 | 1): { x: number; y: number } {
+  // Para el equipo 0, la base está en la esquina superior izquierda pero con margen de seguridad
+  if (team === 0) {
+    return {
+      // Aumentamos la distancia desde el borde añadiendo el margen de seguridad
+      x: PHMAX / 2 - MIDAJ / 2 + MARGEN_SEGURIDAD,
+      y: PVMAX / 2 - MIDAJ / 2 + MARGEN_SEGURIDAD,
+    };
+  }
+  // Para el equipo 1, la base está en la esquina inferior derecha pero con margen de seguridad
+  else {
+    return {
+      // Aumentamos la distancia desde el borde restando el margen de seguridad
+      x: config.width - PHMAX / 2 - MIDAJ / 2 - MARGEN_SEGURIDAD,
+      y: config.height - PVMAX / 2 - MIDAJ / 2 - MARGEN_SEGURIDAD,
+    };
+  }
 }
 
 // Inicializar la estructura SVG cuando el DOM está completamente cargado
