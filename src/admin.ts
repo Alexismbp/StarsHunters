@@ -48,11 +48,11 @@ function setConfig(): void {
   const height = parseInt(
     (document.getElementById("height") as HTMLInputElement).value
   );
-  const pisos = parseInt(
-    (document.getElementById("pisos") as HTMLInputElement).value
+  const scoreLimit = parseInt(
+    (document.getElementById("scoreLimit") as HTMLInputElement)?.value || "10"
   );
 
-  if (isNaN(width) || isNaN(height) || isNaN(pisos)) {
+  if (isNaN(width) || isNaN(height) || isNaN(scoreLimit)) {
     alert("Si us plau, introdueix valors numèrics vàlids");
     return;
   }
@@ -63,8 +63,8 @@ function setConfig(): void {
     width > 1280 ||
     height < 480 ||
     height > 960 ||
-    pisos < 4 ||
-    pisos > 8
+    scoreLimit < 1 ||
+    scoreLimit > 50
   ) {
     alert("Valors fora de rang. Si us plau, revisa les dades.");
     return;
@@ -76,7 +76,7 @@ function setConfig(): void {
     data: {
       width: width,
       height: height,
-      pisos: pisos,
+      scoreLimit: scoreLimit,
     },
   };
 
@@ -159,8 +159,26 @@ function init(): void {
             message.data.width.toString();
           (document.getElementById("height") as HTMLInputElement).value =
             message.data.height.toString();
-          (document.getElementById("pisos") as HTMLInputElement).value =
-            message.data.pisos.toString();
+
+          // Eliminar el campo de pisos si existe
+          const pisosInput = document.getElementById(
+            "pisos"
+          ) as HTMLInputElement;
+          if (pisosInput) {
+            // Ocultar el campo de pisos
+            const pisosContainer = pisosInput.parentElement;
+            if (pisosContainer) {
+              pisosContainer.style.display = "none";
+            }
+          }
+
+          // Actualizar el campo de límite de puntuación si existe
+          const scoreLimitInput = document.getElementById(
+            "scoreLimit"
+          ) as HTMLInputElement;
+          if (scoreLimitInput && message.data.scoreLimit !== undefined) {
+            scoreLimitInput.value = message.data.scoreLimit.toString();
+          }
 
           // También actualizar la configuración visual
           configurar(message.data);
@@ -176,22 +194,23 @@ function init(): void {
         (document.getElementById("engegar") as HTMLButtonElement).textContent =
           "Engegar";
         break;
+      case "starCollision":
+        // Registrar cuando un jugador recoge una estrella
+        if ("jugadorId" in message && "nuevaPuntuacion" in message) {
+          console.log(
+            `⭐ Jugador ${message.jugadorId} ha recogido una estrella. Nueva puntuación: ${message.nuevaPuntuacion}`
+          );
+        }
+        break;
       case "dibuixar":
         // Registra l'estat actual del joc i actualitza el dibuix
         const gameState = message as GameStateMessage;
         console.log("🎨 Actualitzant estat del joc:", {
           jugadors: gameState.jugadors?.length || 0,
           pedres: gameState.pedres?.length || 0,
-          punts: gameState.punts || [0, 0],
         });
 
-        // Asegurar que punts es del tipo correcto [number, number]
-        const punts: [number, number] =
-          Array.isArray(gameState.punts) && gameState.punts.length >= 2
-            ? [gameState.punts[0], gameState.punts[1]]
-            : [0, 0];
-
-        dibuixar(gameState.jugadors || [], gameState.pedres || [], punts);
+        dibuixar(gameState.jugadors || [], gameState.pedres || []);
         break;
       default:
         // Mostra per consola el missatge

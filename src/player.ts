@@ -8,6 +8,7 @@ import {
   configurar,
   dibuixar,
   setId,
+  detectarColision, // Añadimos la importación de detectarColision
 } from "./pyramid.js";
 
 // Interfaces para mensajes
@@ -23,10 +24,11 @@ interface DirectionMessage extends BaseMessage {
   type: "direccio";
   id: number;
   direction: Direction;
+  angle?: number; // Añadimos el ángulo al mensaje de dirección
 }
 
-interface GrabMessage extends BaseMessage {
-  type: "agafar";
+interface CollectStarMessage extends BaseMessage {
+  type: "recolectarEstrella";
   id: number;
 }
 
@@ -45,7 +47,6 @@ interface DrawMessage extends BaseMessage {
   type: "dibuixar";
   jugadors: Player[];
   pedres: Stone[];
-  punts: number[];
 }
 
 interface MessageMessage extends BaseMessage {
@@ -55,6 +56,19 @@ interface MessageMessage extends BaseMessage {
 
 interface CollisionMessage extends BaseMessage {
   type: "colision";
+}
+
+interface WinnerMessage extends BaseMessage {
+  type: "ganador";
+  id: string | number;
+}
+
+// Interfaces para mensajes adicionales para colisiones con estrellas
+interface StarCollisionMessage extends BaseMessage {
+  type: "starCollision";
+  jugadorId: string | number;
+  estrellaId: number;
+  nuevaPuntuacion: number;
 }
 
 // Tipos e interfaces adicionales
@@ -67,6 +81,7 @@ let playerId: number | null = null;
 let currentDirection: Direction = null;
 let moveInterval: number | null = null;
 let diagonalInterval: number | null = null;
+let currentAngle: number = 0; // Nueva variable para mantener el ángulo actual
 
 // Objeto para rastrear qué teclas están actualmente presionadas
 const keysPressed: { [key: string]: boolean } = {
@@ -83,6 +98,24 @@ const keysPressed: { [key: string]: boolean } = {
 ///////////////////////////////////////////////////////////
 // ALUMNE: Alberto González, Biel Martínez
 ///////////////////////////////////////////////////////////
+
+// Función para calcular el ángulo según la dirección
+function getAngleFromDirection(): number {
+  // Movimiento diagonal
+  if (keysPressed.up && keysPressed.right) return 45;
+  if (keysPressed.down && keysPressed.right) return 135;
+  if (keysPressed.down && keysPressed.left) return 225;
+  if (keysPressed.up && keysPressed.left) return 315;
+
+  // Movimiento simple
+  if (keysPressed.up) return 0;
+  if (keysPressed.right) return 90;
+  if (keysPressed.down) return 180;
+  if (keysPressed.left) return 270;
+
+  // Si no hay movimiento, mantener el último ángulo
+  return currentAngle;
+}
 
 // Calcular la dirección principal basada en las teclas presionadas
 function calculateMainDirection(): Direction {
@@ -121,11 +154,15 @@ function sendDirection(direction: Direction): void {
     return;
   }
 
+  // Actualizar el ángulo actual según las teclas presionadas
+  currentAngle = getAngleFromDirection();
+
   ws.send(
     JSON.stringify({
       type: "direccio",
       id: playerId,
       direction: direction,
+      angle: currentAngle, // Enviamos el ángulo junto con la dirección
     })
   );
 }
@@ -216,15 +253,8 @@ function direccio(ev: KeyboardEvent): void {
   if (ev.repeat) return;
 
   // Para teclas de acción inmediata (espacio, enter)
-  if (ev.key === " " || ev.key === "Enter") {
-    ws.send(
-      JSON.stringify({
-        type: "agafar",
-        id: playerId,
-      })
-    );
-    return;
-  }
+  // Ya no necesitamos el mensaje "agafar" para recoger estrellas manualmente
+  // Las estrellas se recogerán automáticamente por colisión
 
   // Actualizar el estado de las teclas cuando se presionan
   switch (ev.key) {
@@ -300,15 +330,17 @@ function init(): void {
           setId(playerId);
           console.log("✅ Connectat com a jugador", playerId);
 
-          // Pisos
+          // Aplicar configuración inicial
           if (connectedMsg.config) {
             console.log("⚙️ Configuració inicial rebuda:", connectedMsg.config);
             configurar(connectedMsg.config);
-            const pisosInput = document.getElementById(
-              "pisos"
+
+            // Mostrar el límite de puntuación si existe en la interfaz
+            const scoreLimitInput = document.getElementById(
+              "scoreLimit"
             ) as HTMLInputElement;
-            if (pisosInput) {
-              pisosInput.value = connectedMsg.config.pisos.toString();
+            if (scoreLimitInput && connectedMsg.config.scoreLimit) {
+              scoreLimitInput.value = connectedMsg.config.scoreLimit.toString();
             }
           }
           break;
@@ -322,30 +354,46 @@ function init(): void {
           }
           console.log("⚙️ Nova configuració rebuda:", configMsg.data);
           configurar(configMsg.data);
-          const pisosInput = document.getElementById(
-            "pisos"
+
+          // Mostrar el límite de puntuación si existe en la interfaz
+          const scoreLimitInput = document.getElementById(
+            "scoreLimit"
           ) as HTMLInputElement;
-          if (pisosInput) {
-            pisosInput.value = configMsg.data.pisos.toString();
+          if (scoreLimitInput && configMsg.data.scoreLimit) {
+            scoreLimitInput.value = configMsg.data.scoreLimit.toString();
           }
           break;
 
         case "dibuixar":
-          // Dibuixa jugador, pedres i punts
+          // Dibuixa jugadors i pedres
           const drawMsg = message as DrawMessage;
           console.log("🎨 Actualitzant estat del joc:", {
             jugadors: drawMsg.jugadors?.length || 0,
             pedres: drawMsg.pedres?.length || 0,
-            punts: drawMsg.punts || [0, 0],
           });
 
-          // Asegurar que punts es del tipo correcto [number, number]
-          const punts: [number, number] =
-            Array.isArray(drawMsg.punts) && drawMsg.punts.length >= 2
-              ? [drawMsg.punts[0], drawMsg.punts[1]]
-              : [0, 0];
+          // Ahora dibuixar sólo recibe dos parámetros: jugadores y piedras
+          dibuixar(drawMsg.jugadors || [], drawMsg.pedres || []);
 
-          dibuixar(drawMsg.jugadors || [], drawMsg.pedres || [], punts);
+          // Comprobar si hay colisiones entre la nave del jugador actual y alguna estrella
+          // Nota: Esto normalmente lo haría el servidor, pero podemos hacer una comprobación extra en el cliente
+          if (playerId !== null) {
+            const jugadorActual = drawMsg.jugadors?.find(
+              (j) => j.id === playerId
+            );
+            if (jugadorActual) {
+              drawMsg.pedres?.forEach((estrella) => {
+                if (detectarColision(jugadorActual, estrella)) {
+                  console.log("Posible colisión detectada con estrella");
+                }
+              });
+            }
+          }
+          break;
+
+        case "ganador":
+          const winnerMsg = message as WinnerMessage;
+          console.log(`🏆 El jugador ${winnerMsg.id} ha ganado el juego!`);
           break;
 
         case "engegar":
@@ -371,6 +419,22 @@ function init(): void {
             });
           }
           break;
+
+        // Nuevo tipo de mensaje para colisiones con estrellas
+        case "starCollision":
+          const starMsg = message as StarCollisionMessage;
+          console.log(
+            `⭐ Jugador ${starMsg.jugadorId} ha recogido una estrella. Nueva puntuación: ${starMsg.nuevaPuntuacion}`
+          );
+
+          // Si somos nosotros, mostrar un mensaje en la consola
+          if (playerId === starMsg.jugadorId) {
+            console.log("¡Has recogido una estrella! +1 punto");
+          }
+
+          // La actualización visual se manejará en el siguiente mensaje dibuixar
+          break;
+
         default:
           console.log("❓ Missatge no processat:", message);
       }

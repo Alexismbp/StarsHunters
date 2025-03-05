@@ -19,9 +19,17 @@
           <label for="height">Alto:</label>
           <input type="number" id="height" min="480" max="960" value="600" />
         </div>
+        <!-- Se eliminó la configuración de pisos -->
         <div class="config-item">
-          <label for="pisos">Pisos:</label>
-          <input type="number" id="pisos" min="4" max="8" value="4" />
+          <label for="scoreLimit">Límit de puntuació:</label>
+          <input
+            type="number"
+            id="scoreLimit"
+            min="1"
+            max="50"
+            value="10"
+            class="form-control"
+          />
         </div>
         <div class="button-group">
           <button id="configurar">Configurar</button>
@@ -35,7 +43,6 @@
           height="600"
           viewBox="0 0 800 600"
         >
-          <g id="pyramid"></g>
           <g id="stones"></g>
           <g id="players"></g>
         </svg>

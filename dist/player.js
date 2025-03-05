@@ -1,12 +1,14 @@
 "use strict";
 // Importamos las funciones y tipos desde pyramid.ts
-import { configurar, dibuixar, setId, } from "./pyramid.js";
+import { configurar, dibuixar, setId, detectarColision, // Añadimos la importación de detectarColision
+ } from "./pyramid.js";
 // Variables globales
 let ws = null;
 let playerId = null;
 let currentDirection = null;
 let moveInterval = null;
 let diagonalInterval = null;
+let currentAngle = 0; // Nueva variable para mantener el ángulo actual
 // Objeto para rastrear qué teclas están actualmente presionadas
 const keysPressed = {
     up: false,
@@ -20,6 +22,29 @@ const keysPressed = {
 ///////////////////////////////////////////////////////////
 // ALUMNE: Alberto González, Biel Martínez
 ///////////////////////////////////////////////////////////
+// Función para calcular el ángulo según la dirección
+function getAngleFromDirection() {
+    // Movimiento diagonal
+    if (keysPressed.up && keysPressed.right)
+        return 45;
+    if (keysPressed.down && keysPressed.right)
+        return 135;
+    if (keysPressed.down && keysPressed.left)
+        return 225;
+    if (keysPressed.up && keysPressed.left)
+        return 315;
+    // Movimiento simple
+    if (keysPressed.up)
+        return 0;
+    if (keysPressed.right)
+        return 90;
+    if (keysPressed.down)
+        return 180;
+    if (keysPressed.left)
+        return 270;
+    // Si no hay movimiento, mantener el último ángulo
+    return currentAngle;
+}
 // Calcular la dirección principal basada en las teclas presionadas
 function calculateMainDirection() {
     if (keysPressed.up)
@@ -57,10 +82,13 @@ function sendDirection(direction) {
         !direction) {
         return;
     }
+    // Actualizar el ángulo actual según las teclas presionadas
+    currentAngle = getAngleFromDirection();
     ws.send(JSON.stringify({
         type: "direccio",
         id: playerId,
         direction: direction,
+        angle: currentAngle, // Enviamos el ángulo junto con la dirección
     }));
 }
 // Actualiza el movimiento basado en el estado actual de las teclas
@@ -140,13 +168,8 @@ function direccio(ev) {
     if (ev.repeat)
         return;
     // Para teclas de acción inmediata (espacio, enter)
-    if (ev.key === " " || ev.key === "Enter") {
-        ws.send(JSON.stringify({
-            type: "agafar",
-            id: playerId,
-        }));
-        return;
-    }
+    // Ya no necesitamos el mensaje "agafar" para recoger estrellas manualmente
+    // Las estrellas se recogerán automáticamente por colisión
     // Actualizar el estado de las teclas cuando se presionan
     switch (ev.key) {
         case "ArrowUp":
@@ -213,13 +236,14 @@ function init() {
                     // Establecer el ID en pyramid.ts
                     setId(playerId);
                     console.log("✅ Connectat com a jugador", playerId);
-                    // Pisos
+                    // Aplicar configuración inicial
                     if (connectedMsg.config) {
                         console.log("⚙️ Configuració inicial rebuda:", connectedMsg.config);
                         configurar(connectedMsg.config);
-                        const pisosInput = document.getElementById("pisos");
-                        if (pisosInput) {
-                            pisosInput.value = connectedMsg.config.pisos.toString();
+                        // Mostrar el límite de puntuación si existe en la interfaz
+                        const scoreLimitInput = document.getElementById("scoreLimit");
+                        if (scoreLimitInput && connectedMsg.config.scoreLimit) {
+                            scoreLimitInput.value = connectedMsg.config.scoreLimit.toString();
                         }
                     }
                     break;
@@ -232,24 +256,37 @@ function init() {
                     }
                     console.log("⚙️ Nova configuració rebuda:", configMsg.data);
                     configurar(configMsg.data);
-                    const pisosInput = document.getElementById("pisos");
-                    if (pisosInput) {
-                        pisosInput.value = configMsg.data.pisos.toString();
+                    // Mostrar el límite de puntuación si existe en la interfaz
+                    const scoreLimitInput = document.getElementById("scoreLimit");
+                    if (scoreLimitInput && configMsg.data.scoreLimit) {
+                        scoreLimitInput.value = configMsg.data.scoreLimit.toString();
                     }
                     break;
                 case "dibuixar":
-                    // Dibuixa jugador, pedres i punts
+                    // Dibuixa jugadors i pedres
                     const drawMsg = message;
                     console.log("🎨 Actualitzant estat del joc:", {
                         jugadors: drawMsg.jugadors?.length || 0,
                         pedres: drawMsg.pedres?.length || 0,
-                        punts: drawMsg.punts || [0, 0],
                     });
-                    // Asegurar que punts es del tipo correcto [number, number]
-                    const punts = Array.isArray(drawMsg.punts) && drawMsg.punts.length >= 2
-                        ? [drawMsg.punts[0], drawMsg.punts[1]]
-                        : [0, 0];
-                    dibuixar(drawMsg.jugadors || [], drawMsg.pedres || [], punts);
+                    // Ahora dibuixar sólo recibe dos parámetros: jugadores y piedras
+                    dibuixar(drawMsg.jugadors || [], drawMsg.pedres || []);
+                    // Comprobar si hay colisiones entre la nave del jugador actual y alguna estrella
+                    // Nota: Esto normalmente lo haría el servidor, pero podemos hacer una comprobación extra en el cliente
+                    if (playerId !== null) {
+                        const jugadorActual = drawMsg.jugadors?.find((j) => j.id === playerId);
+                        if (jugadorActual) {
+                            drawMsg.pedres?.forEach((estrella) => {
+                                if (detectarColision(jugadorActual, estrella)) {
+                                    console.log("Posible colisión detectada con estrella");
+                                }
+                            });
+                        }
+                    }
+                    break;
+                case "ganador":
+                    const winnerMsg = message;
+                    console.log(`🏆 El jugador ${winnerMsg.id} ha ganado el juego!`);
                     break;
                 case "engegar":
                     console.log("🎮 Joc iniciat");
@@ -272,6 +309,16 @@ function init() {
                             keysPressed[key] = false;
                         });
                     }
+                    break;
+                // Nuevo tipo de mensaje para colisiones con estrellas
+                case "starCollision":
+                    const starMsg = message;
+                    console.log(`⭐ Jugador ${starMsg.jugadorId} ha recogido una estrella. Nueva puntuación: ${starMsg.nuevaPuntuacion}`);
+                    // Si somos nosotros, mostrar un mensaje en la consola
+                    if (playerId === starMsg.jugadorId) {
+                        console.log("¡Has recogido una estrella! +1 punto");
+                    }
+                    // La actualización visual se manejará en el siguiente mensaje dibuixar
                     break;
                 default:
                     console.log("❓ Missatge no processat:", message);
