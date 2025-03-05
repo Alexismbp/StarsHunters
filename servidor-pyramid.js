@@ -319,14 +319,15 @@ function crearJugador(ws, m) {
   // Asignar equip basat en el nombre de jugadors
   const team = team0Count <= team1Count ? 0 : 1;
 
-  // Crear un jugador con posición inicial y puntuación inicial
+  // Crear un jugador con posición inicial, puntuación y dirección inicial
   players[playerId] = {
     id: playerId,
     ws: ws,
     x: team === 0 ? 0 : config.width - MIDAJ,
     y: team === 0 ? 0 : config.height - MIDAJ,
     team: team,
-    puntuacion: 0, // Inicializar la puntuación a 0
+    puntuacion: 0,
+    direction: null, // Inicializar dirección a null
   };
 
   // Enviar identificador i configuració
@@ -347,9 +348,10 @@ function crearJugador(ws, m) {
 //	segons l'equip, a intervals regulars
 // Posar els punts dels dos equips a 0
 function reiniciar() {
-  // Resetear las puntuaciones de todos los jugadores
+  // Resetear las puntuaciones y posiciones de todos los jugadores
   Object.values(players).forEach((jugador) => {
     jugador.puntuacion = 0;
+    jugador.direction = null; // Resetear dirección
     if (jugador.team === 0) {
       jugador.x = 0;
       jugador.y = 0;
@@ -575,12 +577,7 @@ function agafar(ws, m) {
 }
 
 // Esdeveniment: direcció
-//	Actualitzar la direcció del jugador
-
-function broadcastPlayers() {
-  enviarEstatJoc();
-}
-
+// Ahora solo actualiza la dirección del jugador y el ángulo, sin mover inmediatamente
 function direccio(ws, m) {
   // Verificar si el joc està en marxa
   if (!gameRunning) return;
@@ -590,43 +587,18 @@ function direccio(ws, m) {
   const player = players[playerId];
 
   if (player) {
-    // Actualitzar la posició del jugador
-    let newX = player.x;
-    let newY = player.y;
+    // Guardar la dirección actual del jugador
+    player.direction = data.direction;
 
-    switch (data.direction) {
-      // Actualitzar la posició segons la direcció
-      case "up":
-        newY -= INCHV;
-        break;
-      case "down":
-        newY += INCHV;
-        break;
-      case "left":
-        newX -= INCHV;
-        break;
-      case "right":
-        newX += INCHV;
-        break;
-    }
-
-    // Guardar el ángulo recibido del cliente
+    // Guardar el ángulo recibido del cliente si existe
     if (data.angle !== undefined) {
       player.angle = data.angle;
     }
-
-    // Comprovar que no surt de la zona de joc
-    if (
-      newX >= 0 &&
-      newX <= config.width - MIDAJ &&
-      newY >= 0 &&
-      newY <= config.height - MIDAJ
-    ) {
-      player.x = newX;
-      player.y = newY;
-      enviarEstatJoc();
-    }
   }
+}
+
+function broadcastPlayers() {
+  enviarEstatJoc();
 }
 
 /********** Temporitzador del joc **********/
@@ -650,12 +622,66 @@ function mou() {
   // Comprovar si el joc està en marxa
   if (!gameRunning) return;
 
-  // Actualitzar posicions dels jugadors
+  // Actualitzar posicions dels jugadors según su última dirección
   Object.values(players).forEach((player) => {
-    // Actualitzar posició del jugador
-    if (player.stone) {
-      player.stone.x = player.x;
-      player.stone.y = player.y;
+    // Mover el jugador según su dirección actual
+    if (player.direction) {
+      let newX = player.x;
+      let newY = player.y;
+
+      // Factor para movimiento diagonal (aproximadamente 0.7071 = 1/raíz cuadrada de 2)
+      // Esto asegura que el movimiento diagonal no sea más rápido que el movimiento en línea recta
+      const diagonalFactor = 0.7071;
+
+      // Actualizar posición según la dirección guardada
+      switch (player.direction) {
+        case "up":
+          newY -= INCHV;
+          break;
+        case "down":
+          newY += INCHV;
+          break;
+        case "left":
+          newX -= INCHV;
+          break;
+        case "right":
+          newX += INCHV;
+          break;
+        // Nuevos casos para movimiento diagonal
+        case "up-left":
+          newX -= INCHV * diagonalFactor;
+          newY -= INCHV * diagonalFactor;
+          break;
+        case "up-right":
+          newX += INCHV * diagonalFactor;
+          newY -= INCHV * diagonalFactor;
+          break;
+        case "down-left":
+          newX -= INCHV * diagonalFactor;
+          newY += INCHV * diagonalFactor;
+          break;
+        case "down-right":
+          newX += INCHV * diagonalFactor;
+          newY += INCHV * diagonalFactor;
+          break;
+      }
+
+      // Comprobar que no sale de la zona de juego
+      if (
+        newX >= 0 &&
+        newX <= config.width - MIDAJ &&
+        newY >= 0 &&
+        newY <= config.height - MIDAJ
+      ) {
+        player.x = newX;
+        player.y = newY;
+
+        // Actualizar posición de la piedra si la lleva
+        if (player.stone) {
+          player.stone.x = newX;
+          player.stone.y = newY;
+        }
+      }
     }
 
     // Comprobar colisiones con estrellas

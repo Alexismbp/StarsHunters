@@ -7,9 +7,10 @@ mostrarEfectoRecoleccion, // Importamos también la función de efectos
 let ws = null;
 let playerId = null;
 let currentDirection = null;
-let moveInterval = null;
-let diagonalInterval = null;
 let currentAngle = 0; // Nueva variable para mantener el ángulo actual
+// Eliminamos las variables de intervalo ya que no las usaremos
+// let moveInterval: number | null = null;
+// let diagonalInterval: number | null = null;
 // Objeto para rastrear qué teclas están actualmente presionadas
 const keysPressed = {
     up: false,
@@ -24,33 +25,43 @@ const colisionesEstrellas = new Set();
  * EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
  *************************************************/
 ///////////////////////////////////////////////////////////
-// ALUMNE: Alberto González, Biel Martínez
+// ALUMNE: Alexis Boisset, Biel Martínez
 ///////////////////////////////////////////////////////////
 // Función para calcular el ángulo según la dirección
 function getAngleFromDirection() {
     // Movimiento diagonal
     if (keysPressed.up && keysPressed.right)
-        return 225;
+        return 225; // Invertido de 45 a 225
     if (keysPressed.down && keysPressed.right)
-        return 315;
+        return 315; // Invertido de 135 a 315
     if (keysPressed.down && keysPressed.left)
-        return 45;
+        return 45; // Invertido de 225 a 45
     if (keysPressed.up && keysPressed.left)
-        return 135;
+        return 135; // Invertido de 315 a 135
     // Movimiento simple
     if (keysPressed.up)
-        return 180;
+        return 180; // Invertido de 0 a 180
     if (keysPressed.right)
-        return 270;
+        return 270; // Invertido de 90 a 270
     if (keysPressed.down)
-        return 0;
+        return 0; // Invertido de 180 a 0
     if (keysPressed.left)
-        return 90;
+        return 90; // Invertido de 270 a 90
     // Si no hay movimiento, mantener el último ángulo conocido
     return currentAngle;
 }
-// Calcular la dirección principal basada en las teclas presionadas
+// Calcular la dirección basada en las teclas presionadas, incluidas las diagonales
 function calculateMainDirection() {
+    // Primero comprobamos las diagonales
+    if (keysPressed.up && keysPressed.left)
+        return "up-left";
+    if (keysPressed.up && keysPressed.right)
+        return "up-right";
+    if (keysPressed.down && keysPressed.left)
+        return "down-left";
+    if (keysPressed.down && keysPressed.right)
+        return "down-right";
+    // Luego las direcciones simples
     if (keysPressed.up)
         return "up";
     if (keysPressed.down)
@@ -61,34 +72,17 @@ function calculateMainDirection() {
         return "right";
     return null;
 }
-// Calcular dirección secundaria para movimiento diagonal
-function calculateSecondaryDirection() {
-    if (keysPressed.up && keysPressed.left)
-        return "left";
-    if (keysPressed.up && keysPressed.right)
-        return "right";
-    if (keysPressed.down && keysPressed.left)
-        return "left";
-    if (keysPressed.down && keysPressed.right)
-        return "right";
-    return null;
-}
-// Determinar si tenemos movimiento diagonal
-function isDiagonalMovement() {
-    return ((keysPressed.up && (keysPressed.left || keysPressed.right)) ||
-        (keysPressed.down && (keysPressed.left || keysPressed.right)));
-}
 // Enviar una dirección al servidor
-function sendDirection(direction) {
-    if (!ws ||
-        ws.readyState !== WebSocket.OPEN ||
-        playerId === null ||
-        !direction) {
+function sendDirection() {
+    if (!ws || ws.readyState !== WebSocket.OPEN || playerId === null) {
         return;
     }
-    // Actualizar el ángulo actual según las teclas presionadas
+    // Calcular la dirección principal según las teclas presionadas
+    const direction = calculateMainDirection();
+    // Actualizar la dirección actual y el ángulo
+    currentDirection = direction;
     currentAngle = getAngleFromDirection();
-    // Siempre enviar el ángulo actualizado junto con la dirección
+    // Enviar mensaje al servidor con la dirección y el ángulo
     ws.send(JSON.stringify({
         type: "direccio",
         id: playerId,
@@ -96,48 +90,13 @@ function sendDirection(direction) {
         angle: currentAngle,
     }));
 }
-// Actualiza el movimiento basado en el estado actual de las teclas
-function updateMovement() {
-    if (!ws || ws.readyState !== WebSocket.OPEN || playerId === null) {
-        return;
-    }
-    // Detener los intervalos existentes
-    if (moveInterval) {
-        clearInterval(moveInterval);
-        moveInterval = null;
-    }
-    if (diagonalInterval) {
-        clearInterval(diagonalInterval);
-        diagonalInterval = null;
-    }
-    const mainDirection = calculateMainDirection();
-    currentDirection = mainDirection;
-    // Si no hay dirección, salir
-    if (!mainDirection)
-        return;
-    // Comprobar si es un movimiento diagonal
-    if (isDiagonalMovement()) {
-        const secondaryDirection = calculateSecondaryDirection();
-        // Implementar movimiento diagonal alternando entre direcciones
-        moveInterval = window.setInterval(() => {
-            sendDirection(mainDirection);
-        }, 100);
-        diagonalInterval = window.setInterval(() => {
-            sendDirection(secondaryDirection);
-        }, 100);
-    }
-    else {
-        // Movimiento normal
-        moveInterval = window.setInterval(() => {
-            sendDirection(mainDirection);
-        }, 100);
-    }
-}
-// Añadimos manejador para detener el movimiento cuando se suelta la tecla
+// Manejador para cuando se suelta una tecla
 function aturarMoviment(ev) {
     if (!ws || ws.readyState !== WebSocket.OPEN || playerId === null) {
         return;
     }
+    // Estado anterior de teclas para comparar si hay cambios
+    const prevState = { ...keysPressed };
     // Actualizar el estado de las teclas cuando se sueltan
     switch (ev.key) {
         case "ArrowUp":
@@ -161,8 +120,15 @@ function aturarMoviment(ev) {
             keysPressed.right = false;
             break;
     }
-    // Recalcular la dirección y actualizar el movimiento
-    updateMovement();
+    // Verificar si hay cambios en el estado de las teclas
+    const directionChanged = prevState.up !== keysPressed.up ||
+        prevState.down !== keysPressed.down ||
+        prevState.left !== keysPressed.left ||
+        prevState.right !== keysPressed.right;
+    // Solo enviar dirección si ha cambiado el estado de las teclas
+    if (directionChanged) {
+        sendDirection();
+    }
 }
 // Gestor de l'esdeveniment per les tecles
 function direccio(ev) {
@@ -172,9 +138,8 @@ function direccio(ev) {
     // Evitar repetición si la tecla ya está presionada
     if (ev.repeat)
         return;
-    // Para teclas de acción inmediata (espacio, enter)
-    // Ya no necesitamos el mensaje "agafar" para recoger estrellas manualmente
-    // Las estrellas se recogerán automáticamente por colisión
+    // Estado anterior de teclas para comparar si hay cambios
+    const prevState = { ...keysPressed };
     // Actualizar el estado de las teclas cuando se presionan
     switch (ev.key) {
         case "ArrowUp":
@@ -200,8 +165,15 @@ function direccio(ev) {
         default:
             return; // Si no es una tecla relevante, no hacer nada más
     }
-    // Recalcular la dirección y actualizar el movimiento
-    updateMovement();
+    // Verificar si hay cambios en el estado de las teclas
+    const directionChanged = prevState.up !== keysPressed.up ||
+        prevState.down !== keysPressed.down ||
+        prevState.left !== keysPressed.left ||
+        prevState.right !== keysPressed.right;
+    // Solo enviar dirección si ha cambiado el estado de las teclas
+    if (directionChanged) {
+        sendDirection();
+    }
 }
 // Establir la connexió amb el servidor en el port 8180
 function init() {
@@ -333,16 +305,14 @@ function init() {
                     console.log("💬 Missatge del servidor:", msgMsg.text);
                     break;
                 case "colision":
-                    // Si hi ha col·lisió, aturar el moviment
-                    if (moveInterval) {
-                        clearInterval(moveInterval);
-                        moveInterval = null;
-                        currentDirection = null;
-                        // Reiniciar estado de teclas al detectar colisión
-                        Object.keys(keysPressed).forEach((key) => {
-                            keysPressed[key] = false;
-                        });
-                    }
+                    // Si hay colisión, aturar el movimiento
+                    currentDirection = null;
+                    // Reiniciar estado de teclas al detectar colisión
+                    Object.keys(keysPressed).forEach((key) => {
+                        keysPressed[key] = false;
+                    });
+                    // Informar al servidor que ya no hay dirección de movimiento
+                    sendDirection();
                     break;
                 // Nuevo tipo de mensaje para colisiones con estrellas
                 case "starCollision":
