@@ -22,6 +22,7 @@ export type Config = {
   width: number;
   height: number;
   scoreLimit: number; // Límite de puntuación para ganar
+  timeLimit?: number; // Tiempo límite en segundos (opcional)
 };
 
 // Namespace per crear objectes SVG
@@ -50,6 +51,9 @@ const NAU_ENEMIGA: string = "img/nau4.svg"; // Nave del enemigo
 // Ruta a la imagen de la estrella
 const ESTRELLA: string = "img/estrella.svg"; // Imagen de estrella para recolectar
 
+// Caché de imágenes para evitar cargas repetitivas
+const imageCache: { [key: string]: string } = {};
+
 let connexio: any;
 // Inicializamos config con valores predeterminados
 let config: Config = {
@@ -60,6 +64,30 @@ let config: Config = {
 let id: string | number | undefined;
 let svgInitialized: boolean = false;
 let winner: string | number | null = null; // Variable para almacenar el ID del jugador ganador
+let timerInterval: number | null = null; // Para guardar el intervalo del temporizador
+let remainingTime: number = 0; // Tiempo restante en segundos
+let timerActive: boolean = false; // Para controlar si el temporizador está activo
+
+// Función para precargar las imágenes en el caché
+function preloadImages(): void {
+  const imagesToPreload = [NAU_PROPIA, NAU_ENEMIGA, ESTRELLA];
+
+  imagesToPreload.forEach((src) => {
+    // Solo cargar si no existe en caché
+    if (!imageCache[src]) {
+      fetch(src)
+        .then((response) => response.text())
+        .then((svgText) => {
+          // Almacenar el contenido SVG en el caché
+          imageCache[src] = `data:image/svg+xml;base64,${btoa(svgText)}`;
+          console.log(`Imagen precargada: ${src}`);
+        })
+        .catch((error) => {
+          console.error(`Error al precargar ${src}:`, error);
+        });
+    }
+  });
+}
 
 // Función para inicializar la estructura SVG si no existe
 function initializeSvgStructure(): void {
@@ -87,8 +115,12 @@ function initializeSvgStructure(): void {
 
   if (!svg.getElementById("stones")) {
     const stonesGroup = document.createElementNS(svgNS, "g");
+    stonesGroup.setAttribute("id", "stones");
     svg.appendChild(stonesGroup);
   }
+
+  // Precargar imágenes al inicializar
+  preloadImages();
 
   svgInitialized = true;
 }
@@ -111,7 +143,13 @@ function imageSVG(
   img.setAttributeNS(null, "y", y.toString());
   img.setAttributeNS(null, "width", width.toString());
   img.setAttributeNS(null, "height", height.toString());
-  img.setAttributeNS("http://www.w3.org/1999/xlink", "href", src);
+
+  // Usar imagen desde el caché si está disponible
+  if (imageCache[src]) {
+    img.setAttributeNS("http://www.w3.org/1999/xlink", "href", imageCache[src]);
+  } else {
+    img.setAttributeNS("http://www.w3.org/1999/xlink", "href", src);
+  }
 
   // Normalizar el ángulo de entrada a un valor entre 0-359
   angle = ((angle % 360) + 360) % 360;
@@ -178,66 +216,46 @@ function mostrarGanador(jugadorId: string | number): void {
   winnerDisplay.appendChild(subText);
 }
 
-// Función para mostrar las puntuaciones de todos los jugadores
+// Función para mostrar las puntuaciones de todos los jugadores (fuera del SVG)
 function mostrarPuntuaciones(jugadores: Jugador[]): void {
-  const svg = document.querySelector("svg") as SVGSVGElement;
+  // Buscar el contenedor de puntuaciones en HTML
+  const scoreContainer = document.getElementById("score-container");
+  if (!scoreContainer) return;
 
-  // Crear grupo para el marcador si no existe
-  let scoreDisplay = svg.getElementById("score-display");
-  if (!scoreDisplay) {
-    scoreDisplay = document.createElementNS(svgNS, "g");
-    scoreDisplay.setAttribute("id", "score-display");
-    svg.appendChild(scoreDisplay);
-  } else {
-    // Limpiar marcador anterior
-    while (scoreDisplay.firstChild) {
-      scoreDisplay.removeChild(scoreDisplay.firstChild);
-    }
-  }
-
-  // Fondo para el tablero de puntuaciones
-  const backRect = document.createElementNS(svgNS, "rect");
-  backRect.setAttribute("x", "10");
-  backRect.setAttribute("y", "10");
-  backRect.setAttribute("width", "180");
-  backRect.setAttribute("height", (30 + 25 * jugadores.length).toString());
-  backRect.setAttribute("fill", "rgba(0,0,0,0.5)");
-  backRect.setAttribute("rx", "10");
-  scoreDisplay.appendChild(backRect);
-
-  // Título del tablero
-  const title = document.createElementNS(svgNS, "text");
-  title.setAttribute("x", "20");
-  title.setAttribute("y", "35");
-  title.setAttribute("font-size", "18");
-  title.setAttribute("fill", "#ffffff");
-  title.setAttribute("font-weight", "bold");
-  title.textContent = "PUNTUACIONES:";
-  scoreDisplay.appendChild(title);
+  // Limpiar contenedor
+  scoreContainer.innerHTML = "";
 
   // Ordenar jugadores por puntuación (mayor a menor)
   const jugadoresOrdenados = [...jugadores].sort(
     (a, b) => b.puntuacion - a.puntuacion
   );
 
+  // Crear tabla de puntuaciones
+  const table = document.createElement("table");
+  table.style.width = "100%";
+  table.style.borderCollapse = "collapse";
+
   // Mostrar puntuación de cada jugador
   jugadoresOrdenados.forEach((jugador, index) => {
-    const playerScore = document.createElementNS(svgNS, "text");
-    playerScore.setAttribute("x", "20");
-    playerScore.setAttribute("y", (60 + index * 25).toString());
-    playerScore.setAttribute("font-size", "16");
+    const row = table.insertRow();
 
     // Destacar al jugador actual
     if (jugador.id === id) {
-      playerScore.setAttribute("fill", "#ffff00"); // Amarillo para el jugador actual
-      playerScore.setAttribute("font-weight", "bold");
-    } else {
-      playerScore.setAttribute("fill", "#ffffff");
+      row.style.color = "#ffff00"; // Amarillo para el jugador actual
+      row.style.fontWeight = "bold";
     }
 
-    playerScore.textContent = `Jugador ${jugador.id}: ${jugador.puntuacion}/${config.scoreLimit}`;
-    scoreDisplay.appendChild(playerScore);
+    const cellJugador = row.insertCell();
+    cellJugador.textContent = `Jugador ${jugador.id}`;
+    cellJugador.style.padding = "5px 0";
+
+    const cellPuntos = row.insertCell();
+    cellPuntos.textContent = `${jugador.puntuacion}/${config.scoreLimit}`;
+    cellPuntos.style.textAlign = "right";
+    cellPuntos.style.padding = "5px 0";
   });
+
+  scoreContainer.appendChild(table);
 }
 
 // Mejorar función para mostrar efecto cuando un jugador recoge una estrella
@@ -320,25 +338,70 @@ export function mostrarEfectoRecoleccion(x: number, y: number): void {
   }
 }
 
-// Función más robusta para detectar colisión entre nave y estrella
+// Función para mostrar efecto de desvanecimiento cuando una estrella desaparece por tiempo
+export function mostrarEfectoDesvanecimiento(x: number, y: number): void {
+  const svg = document.querySelector("svg") as SVGSVGElement;
+
+  // Crear grupo para el efecto si no existe
+  let effectsGroup = svg.getElementById("effects");
+  if (!effectsGroup) {
+    effectsGroup = document.createElementNS(svgNS, "g");
+    effectsGroup.setAttribute("id", "effects");
+    svg.appendChild(effectsGroup);
+  }
+
+  // Crear un resplandor que se desvanece
+  const glow = document.createElementNS(svgNS, "circle");
+  glow.setAttribute("cx", (x + MIDAP / 2).toString());
+  glow.setAttribute("cy", (y + MIDAP / 2).toString());
+  glow.setAttribute("r", MIDAP.toString());
+  glow.setAttribute("fill", "rgba(100, 100, 255, 0.6)");
+  glow.setAttribute("filter", "blur(3px)");
+  effectsGroup.appendChild(glow);
+
+  // Animar el resplandor
+  let opacity = 0.6;
+  let scale = 1.0;
+  const glowAnim = setInterval(() => {
+    opacity -= 0.05;
+    scale += 0.1;
+
+    if (opacity <= 0) {
+      clearInterval(glowAnim);
+      if (effectsGroup && effectsGroup.contains(glow)) {
+        effectsGroup.removeChild(glow);
+      }
+    } else {
+      glow.setAttribute("opacity", opacity.toString());
+      // Efecto de expansión
+      glow.setAttribute("r", (MIDAP * scale).toString());
+    }
+  }, 50);
+}
+
+// Función para detectar colisión entre nave y estrella usando hitbox cuadrada
 export function detectarColision(jugador: Jugador, estrella: Pedra): boolean {
   if (!jugador || !estrella) return false;
 
-  // Obtener las coordenadas del centro de la nave y la estrella
-  const naveCentroX = jugador.x + MIDAJ / 2;
-  const naveCentroY = jugador.y + MIDAJ / 2;
-  const estrellaCentroX = estrella.x + MIDAP / 2;
-  const estrellaCentroY = estrella.y + MIDAP / 2;
+  // Usar hitbox cuadrada (AABB - Axis-Aligned Bounding Box)
+  // Comprobar si hay solapamiento en ambos ejes
+  const naveIzquierda = jugador.x;
+  const naveDerecha = jugador.x + MIDAJ;
+  const naveArriba = jugador.y;
+  const naveAbajo = jugador.y + MIDAJ;
 
-  // Calcular distancia entre los centros
-  const distancia = Math.sqrt(
-    Math.pow(naveCentroX - estrellaCentroX, 2) +
-      Math.pow(naveCentroY - estrellaCentroY, 2)
+  const estrellaIzquierda = estrella.x;
+  const estrellaDerecha = estrella.x + MIDAP;
+  const estrellaArriba = estrella.y;
+  const estrellaAbajo = estrella.y + MIDAP;
+
+  // Hay colisión cuando no hay separación entre los rectángulos
+  return (
+    naveIzquierda < estrellaDerecha &&
+    naveDerecha > estrellaIzquierda &&
+    naveArriba < estrellaAbajo &&
+    naveAbajo > estrellaArriba
   );
-
-  // Si la distancia es menor que la suma de los radios, hay colisión
-  // Ajustamos para hacer la colisión más permisiva
-  return distancia < (MIDAJ + MIDAP) * 0.4; // Factor 0.4 para hacer la colisión más precisa
 }
 
 // Dibujar jugadores, estrellas y puntuación
@@ -407,23 +470,30 @@ export function dibuixar(jugadors: Jugador[], pedres: Pedra[]): void {
     stn.appendChild(estrellaElement);
   }
 
-  // Mostrar la puntuación individual de cada jugador
+  // Mostrar la puntuación individual de cada jugador (ahora fuera del SVG)
   mostrarPuntuaciones(jugadors);
+
+  // Actualizar el temporizador si está activo (ahora fuera del SVG)
+  if (timerActive) {
+    mostrarTemporizador();
+  }
 
   // Comprobar si hay un ganador
   const ganador = jugadors.find((j) => j.puntuacion >= config.scoreLimit);
   if (ganador) {
     mostrarGanador(ganador.id);
+    detenerTemporizador(); // Detener el temporizador si hay un ganador
   }
 }
 
 // Guardar i configurar les mides de la zona de joc
 export function configurar(c: Config): void {
-  // Guardar la configuració
+  // Guardar la configuración
   config = c;
-  // Asegurar que scoreLimit tenga un valor
+
+  // Asegurar valores predeterminados
   if (config.scoreLimit === undefined) {
-    config.scoreLimit = 10; // valor predeterminado
+    config.scoreLimit = 10;
   }
 
   // Modificar la mida de la zona de joc
@@ -437,7 +507,7 @@ export function configurar(c: Config): void {
   svg.setAttribute("height", config.height.toString());
   svg.setAttribute("viewBox", "0 0 " + config.width + " " + config.height);
 
-  // Inicializar la estructura SVG
+  // Inicializar la estructura SVG y precargar imágenes
   initializeSvgStructure();
 
   // Resetear el ganador al configurar un nuevo juego
@@ -450,10 +520,110 @@ export function configurar(c: Config): void {
   }
 }
 
+// Función para mostrar el temporizador (fuera del SVG)
+function mostrarTemporizador(): void {
+  // Si no hay tiempo límite o el temporizador no está activo, no hacer nada
+  if (!timerActive) return;
+
+  // Buscar el contenedor del temporizador en HTML
+  const timerContainer = document.getElementById("timer-container");
+  if (!timerContainer) return;
+
+  // Calcular minutos y segundos
+  const minutos = Math.floor(remainingTime / 60);
+  const segundos = remainingTime % 60;
+  const tiempoFormateado = `${minutos}:${segundos < 10 ? "0" : ""}${segundos}`;
+
+  // Color basado en el tiempo restante (rojo si queda poco tiempo, negro si hay suficiente tiempo)
+  const colorTiempo = remainingTime < 30 ? "#ff3333" : "#000000";
+
+  // Actualizar el contenido del temporizador
+  timerContainer.innerHTML = `<div style="color: ${colorTiempo}">TIEMPO<br>${tiempoFormateado}</div>`;
+}
+
+// Función para actualizar el temporizador con el tiempo del servidor
+export function actualizarTemporizador(tiempoRestante: number): void {
+  // Si no hay un temporizador activo, iniciar uno
+  if (!timerActive) {
+    timerActive = true;
+    remainingTime = tiempoRestante;
+    mostrarTemporizador();
+
+    // Si ya hay un intervalo, eliminarlo para evitar duplicados
+    if (timerInterval) {
+      clearInterval(timerInterval);
+    }
+
+    timerInterval = window.setInterval(() => {
+      remainingTime--;
+
+      if (remainingTime <= 0) {
+        detenerTemporizador();
+        return;
+      }
+
+      mostrarTemporizador();
+    }, 1000);
+  } else {
+    // Si ya hay un temporizador activo, solo actualizamos el tiempo
+    // Este es un buen lugar para corregir desviaciones entre el cliente y el servidor
+    const diferencia = Math.abs(remainingTime - tiempoRestante);
+
+    // Si la diferencia es mayor a 2 segundos, sincronizar con el servidor
+    if (diferencia > 2) {
+      remainingTime = tiempoRestante;
+      mostrarTemporizador();
+    }
+  }
+}
+
+// Función para iniciar o reiniciar el temporizador
+export function iniciarTemporizador(tiempoTotal: number): void {
+  // Este método ahora solo se usará internamente
+  // La sincronización principal vendrá del servidor
+  detenerTemporizador();
+
+  if (!tiempoTotal || tiempoTotal <= 0) return;
+
+  remainingTime = tiempoTotal;
+  timerActive = true;
+  mostrarTemporizador();
+
+  timerInterval = window.setInterval(() => {
+    remainingTime--;
+
+    if (remainingTime <= 0) {
+      detenerTemporizador();
+      return;
+    }
+
+    mostrarTemporizador();
+  }, 1000);
+}
+
+// Función para detener el temporizador
+export function detenerTemporizador(): void {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  timerActive = false;
+
+  // Limpiar el contenedor del temporizador
+  const timerContainer = document.getElementById("timer-container");
+  if (timerContainer) {
+    timerContainer.innerHTML = "";
+  }
+}
+
 // Añadir una función para exponer el ID al exterior
 export function setId(newId: string | number): void {
   id = newId;
 }
 
-// Inicializar la estructura SVG cuando el DOM está completamente cargado
-document.addEventListener("DOMContentLoaded", initializeSvgStructure);
+// Inicializar la estructura SVG y precargar las imágenes cuando el DOM está completamente cargado
+document.addEventListener("DOMContentLoaded", () => {
+  initializeSvgStructure();
+  preloadImages();
+});

@@ -6,6 +6,40 @@
     <title>Stars Hunters - Administrador</title>
     <link rel="stylesheet" href="css/pyramid.css" />
     <link rel="icon" href="favicon.svg" type="image/x-icon" />
+    <style>
+      .game-layout {
+        display: flex;
+        align-items: flex-start;
+      }
+
+      .side-panel {
+        width: 200px;
+        padding: 10px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        margin-right: 10px;
+        border-radius: 5px;
+        min-height: 600px;
+      }
+
+      #timer-container {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      #score-container {
+        margin-top: 20px;
+      }
+
+      h3 {
+        margin-top: 0;
+        border-bottom: 1px solid #444;
+        padding-bottom: 5px;
+        text-align: center;
+      }
+    </style>
   </head>
   <body>
     <div id="admin-container">
@@ -19,7 +53,6 @@
           <label for="height">Alto:</label>
           <input type="number" id="height" min="480" max="960" value="600" />
         </div>
-        <!-- Se eliminó la configuración de pisos -->
         <div class="config-item">
           <label for="scoreLimit">Límit de puntuació:</label>
           <input
@@ -31,21 +64,45 @@
             class="form-control"
           />
         </div>
+        <!-- Nuevo campo para tiempo límite -->
+        <div class="config-item">
+          <label for="timeLimit">Tiempo límite (segundos):</label>
+          <input
+            type="number"
+            id="timeLimit"
+            min="30"
+            max="600"
+            value="300"
+            class="form-control"
+          />
+        </div>
         <div class="button-group">
           <button id="configurar">Configurar</button>
           <button id="engegar">Engegar</button>
         </div>
       </div>
-      <div id="game-view">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="800"
-          height="600"
-          viewBox="0 0 800 600"
-        >
-          <g id="stones"></g>
-          <g id="players"></g>
-        </svg>
+      <div class="game-layout">
+        <div class="side-panel">
+          <h3>INFORMACIÓN</h3>
+          <div id="timer-container">
+            <!-- El temporizador se mostrará aquí -->
+          </div>
+          <h3>PUNTUACIONES</h3>
+          <div id="score-container">
+            <!-- Las puntuaciones se mostrarán aquí -->
+          </div>
+        </div>
+        <div id="game-view">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="800"
+            height="600"
+            viewBox="0 0 800 600"
+          >
+            <g id="stones"></g>
+            <g id="players"></g>
+          </svg>
+        </div>
       </div>
     </div>
     <script type="module" src="dist/pyramid.js"></script>

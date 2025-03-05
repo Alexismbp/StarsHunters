@@ -1,6 +1,8 @@
 "use strict";
 // Importamos los tipos y funciones desde pyramid.ts
-import { dibuixar, configurar } from "./pyramid.js";
+import { dibuixar, configurar, actualizarTemporizador, // Añadimos la importación para el temporizador
+detenerTemporizador, // Importamos también la función para detener el temporizador
+ } from "./pyramid.js";
 let ws;
 ///////////////////////////////////////////////////////////
 // ALUMNE: Alberto González, Biel Martínez
@@ -12,7 +14,9 @@ function setConfig() {
     const width = parseInt(document.getElementById("width").value);
     const height = parseInt(document.getElementById("height").value);
     const scoreLimit = parseInt(document.getElementById("scoreLimit")?.value || "10");
-    if (isNaN(width) || isNaN(height) || isNaN(scoreLimit)) {
+    // Obtener el tiempo límite
+    const timeLimit = parseInt(document.getElementById("timeLimit")?.value || "0");
+    if (isNaN(width) || isNaN(height) || isNaN(scoreLimit) || isNaN(timeLimit)) {
         alert("Si us plau, introdueix valors numèrics vàlids");
         return;
     }
@@ -22,7 +26,8 @@ function setConfig() {
         height < 480 ||
         height > 960 ||
         scoreLimit < 1 ||
-        scoreLimit > 50) {
+        scoreLimit > 50 ||
+        (timeLimit !== 0 && (timeLimit < 30 || timeLimit > 600))) {
         alert("Valors fora de rang. Si us plau, revisa les dades.");
         return;
     }
@@ -33,6 +38,7 @@ function setConfig() {
             width: width,
             height: height,
             scoreLimit: scoreLimit,
+            timeLimit: timeLimit > 0 ? timeLimit : undefined, // Solo enviar si es mayor que 0
         },
     };
     // Enviar el missatge al servidor a través del WebSocket
@@ -131,6 +137,15 @@ function init() {
                 // Canvia el text del botó a 'Engegar' quan el joc s'atura
                 document.getElementById("engegar").textContent =
                     "Engegar";
+                // Detener el temporizador cuando se detiene el juego
+                detenerTemporizador();
+                break;
+            case "timeUpdate":
+                // Añadimos el procesamiento de los mensajes de actualización de tiempo
+                const timeUpdateMsg = message;
+                console.log(`⏱️ Tiempo restante: ${timeUpdateMsg.remainingTime} segundos`);
+                // Actualizar el temporizador con el tiempo recibido
+                actualizarTemporizador(timeUpdateMsg.remainingTime);
                 break;
             case "starCollision":
                 // Registrar cuando un jugador recoge una estrella

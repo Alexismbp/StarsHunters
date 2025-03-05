@@ -130,7 +130,14 @@ var config = {
   height: MINV,
   pisos: NFPMIN,
   pedres: ((NFPMIN + 1) * NFPMIN) / 2,
+  scoreLimit: 10, // Valor predeterminado
+  timeLimit: 0, // Sin límite de tiempo por defecto
 };
+
+// Variables para el temporizador
+let gameTimer = null;
+let remainingTime = 0;
+let timeUpdateInterval = null; // Para enviar actualizaciones de tiempo
 
 /*************************************************
  * EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
@@ -163,6 +170,9 @@ let adminWs = null;
 let pedres = [];
 let punts = [0, 0];
 let idEstrella = 1; // ID para las estrellas, incrementa con cada nueva estrella
+
+// Variables para rastrear temporizadores de estrellas
+let estrellasTimers = {};
 
 console.log("Servidor WebSocket escoltant al port 8180");
 // Esdeveniment del servidor 'wss' per gestionar la connexió d'un client 'ws'
@@ -256,6 +266,12 @@ function tancar(ws) {
     delete players[playerId];
     broadcastPlayers();
   }
+
+  // Comprobar si el client desconnectat és l'administrador
+  if (ws === adminWs) {
+    console.log("Administrador desconnectat");
+    adminWs = null; // Liberar la posición de administrador para que otro usuario pueda reclamarla
+  }
 }
 
 /********** Funcions auxiliars (es criden des de processar()
@@ -319,15 +335,38 @@ function crearJugador(ws, m) {
   // Asignar equip basat en el nombre de jugadors
   const team = team0Count <= team1Count ? 0 : 1;
 
-  // Crear un jugador con posición inicial, puntuación y dirección inicial
+  // Determinar posición inicial basada en el ID del jugador
+  let posicionX, posicionY;
+
+  // Asignar posiciones según el orden de conexión
+  switch (playerId % 4) {
+    case 0: // Primer jugador: Esquina superior izquierda
+      posicionX = 0;
+      posicionY = 0;
+      break;
+    case 1: // Segundo jugador: Esquina inferior derecha
+      posicionX = config.width - 8 * ESCALA;
+      posicionY = config.height - 8 * ESCALA;
+      break;
+    case 2: // Tercer jugador: Esquina superior derecha
+      posicionX = config.width - 8 * ESCALA;
+      posicionY = 0;
+      break;
+    case 3: // Cuarto jugador: Esquina inferior izquierda
+      posicionX = 0;
+      posicionY = config.height - 8 * ESCALA;
+      break;
+  }
+
+  // Crear un jugador con posición inicial asignada, puntuación y dirección inicial
   players[playerId] = {
     id: playerId,
     ws: ws,
-    x: team === 0 ? 0 : config.width - MIDAJ,
-    y: team === 0 ? 0 : config.height - MIDAJ,
+    x: posicionX,
+    y: posicionY,
     team: team,
     puntuacion: 0,
-    direction: null, // Inicializar dirección a null
+    direction: null,
   };
 
   // Enviar identificador i configuració
@@ -352,13 +391,27 @@ function reiniciar() {
   Object.values(players).forEach((jugador) => {
     jugador.puntuacion = 0;
     jugador.direction = null; // Resetear dirección
-    if (jugador.team === 0) {
-      jugador.x = 0;
-      jugador.y = 0;
-    } else {
-      jugador.x = config.width - MIDAJ;
-      jugador.y = config.height - MIDAJ;
+
+    // Determinar posición inicial basada en el ID del jugador
+    switch (parseInt(jugador.id) % 4) {
+      case 0: // Primer jugador: Esquina superior izquierda
+        jugador.x = 0;
+        jugador.y = 0;
+        break;
+      case 1: // Segundo jugador: Esquina inferior derecha
+        jugador.x = config.width - 8 * ESCALA;
+        jugador.y = config.height - 8 * ESCALA;
+        break;
+      case 2: // Tercer jugador: Esquina superior derecha
+        jugador.x = config.width - 8 * ESCALA;
+        jugador.y = 0;
+        break;
+      case 3: // Cuarto jugador: Esquina inferior izquierda
+        jugador.x = 0;
+        jugador.y = config.height - 8 * ESCALA;
+        break;
     }
+
     delete jugador.stone;
   });
 
@@ -472,6 +525,33 @@ function start(ws, m) {
   reiniciar(); // Reiniciar l'estat del joc
   inicializarEstrellas(); // Inicializar las estrellas
 
+  // Iniciar el temporizador si hay un tiempo límite configurado
+  if (config.timeLimit && config.timeLimit > 0) {
+    remainingTime = config.timeLimit;
+
+    // Enviar tiempo inicial a todos los clientes
+    enviarTiempoRestante();
+
+    // Iniciar el temporizador del servidor
+    gameTimer = setInterval(() => {
+      remainingTime--;
+
+      // Cuando el tiempo llega a cero, terminar el juego
+      if (remainingTime <= 0) {
+        clearInterval(gameTimer);
+        gameTimer = null;
+        clearInterval(timeUpdateInterval);
+        timeUpdateInterval = null;
+
+        // Detener el juego y declarar empate o ganador según las puntuaciones actuales
+        determinarResultadoPorTiempo();
+      }
+    }, 1000);
+
+    // Enviar actualizaciones de tiempo a los clientes cada 5 segundos
+    timeUpdateInterval = setInterval(enviarTiempoRestante, 5000);
+  }
+
   // Iniciar el temporitzador que crida a mou()
   gameInterval = setInterval(mou, TEMPS);
 
@@ -481,6 +561,73 @@ function start(ws, m) {
       client.send(JSON.stringify({ type: "engegar" }));
     }
   });
+}
+
+// Función para enviar el tiempo restante a todos los clientes
+function enviarTiempoRestante() {
+  if (!gameRunning || remainingTime <= 0) return;
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(
+        JSON.stringify({
+          type: "timeUpdate",
+          remainingTime: remainingTime,
+        })
+      );
+    }
+  });
+}
+
+// Función para determinar el resultado cuando se agota el tiempo
+function determinarResultadoPorTiempo() {
+  console.log("⏰ Tiempo agotado");
+
+  // Encontrar al jugador con más puntos
+  let mejorJugador = null;
+  let maximaPuntuacion = -1;
+  let empate = false;
+
+  Object.values(players).forEach((jugador) => {
+    if (jugador.puntuacion > maximaPuntuacion) {
+      mejorJugador = jugador;
+      maximaPuntuacion = jugador.puntuacion;
+      empate = false;
+    } else if (jugador.puntuacion === maximaPuntuacion) {
+      empate = true;
+    }
+  });
+
+  // Enviar mensaje de tiempo agotado a todos los clientes
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(
+        JSON.stringify({
+          type: "timeUp",
+          empate: empate,
+          ganadorId: !empate && mejorJugador ? mejorJugador.id : null,
+          maximaPuntuacion: maximaPuntuacion,
+        })
+      );
+    }
+  });
+
+  // Si hay un ganador claro, enviar mensaje de ganador
+  if (!empate && mejorJugador) {
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(
+          JSON.stringify({
+            type: "ganador",
+            id: mejorJugador.id,
+          })
+        );
+      }
+    });
+  }
+
+  // Detener el juego
+  stop(adminWs, null);
 }
 
 // Esdeveniment: aturar
@@ -512,6 +659,21 @@ function stop(ws, m) {
   // Aturar el joc
   gameRunning = false;
   clearInterval(gameInterval); // Aturar el temporitzador
+
+  // Detener también el temporizador si está activo
+  if (gameTimer) {
+    clearInterval(gameTimer);
+    gameTimer = null;
+  }
+
+  // Detener envío de actualizaciones de tiempo
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+    timeUpdateInterval = null;
+  }
+
+  // Limpiar todos los temporizadores de estrellas
+  limpiarTemporazadoresEstrellas();
 
   // Enviar missatge a tots els clients
   wss.clients.forEach((client) => {
@@ -667,11 +829,12 @@ function mou() {
       }
 
       // Comprobar que no sale de la zona de juego
+      // CORREGIDO: Aseguramos que el tamaño completo de la nave queda dentro del tablero (MIDAJ -> 8*ESCALA)
       if (
         newX >= 0 &&
-        newX <= config.width - MIDAJ &&
+        newX <= config.width - 8 * ESCALA && // Usar el tamaño real de la nave (8*ESCALA)
         newY >= 0 &&
-        newY <= config.height - MIDAJ
+        newY <= config.height - 8 * ESCALA // Usar el tamaño real de la nave (8*ESCALA)
       ) {
         player.x = newX;
         player.y = newY;
@@ -767,12 +930,69 @@ function generarEstrella() {
   // Asignar un ID único a la estrella
   const id = idEstrella++;
 
+  // Tiempo de vida aleatorio entre 15 y 45 segundos (aumentado desde 5-15 segundos)
+  const tiempoVida = 15000 + Math.random() * 30000;
+
   // Crear y devolver la nueva estrella
-  return { x, y, id };
+  const estrella = { x, y, id };
+
+  // Programar el temporizador para reposicionar esta estrella
+  programarReposicionEstrella(estrella, tiempoVida);
+
+  return estrella;
+}
+
+// Función para programar la reposición de una estrella
+function programarReposicionEstrella(estrella, tiempoVida) {
+  // Cancelar temporizador anterior si existe
+  if (estrellasTimers[estrella.id]) {
+    clearTimeout(estrellasTimers[estrella.id]);
+  }
+
+  // Crear nuevo temporizador
+  estrellasTimers[estrella.id] = setTimeout(() => {
+    // Si el juego no está corriendo, no hacer nada
+    if (!gameRunning) return;
+
+    // Buscar la estrella en el arreglo
+    const index = pedres.findIndex((e) => e.id === estrella.id);
+    if (index === -1) return; // La estrella ya no existe (fue recogida)
+
+    // Eliminar la estrella del arreglo
+    pedres.splice(index, 1);
+
+    // Notificar a los clientes que la estrella desapareció
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(
+          JSON.stringify({
+            type: "starDisappear",
+            estrellaId: estrella.id,
+          })
+        );
+      }
+    });
+
+    // Crear una nueva estrella en otra posición
+    const nuevaEstrella = generarEstrella();
+    pedres.push(nuevaEstrella);
+
+    // Notificar a todos los clientes
+    enviarEstatJoc();
+  }, tiempoVida);
+}
+
+// Función para limpiar todos los temporizadores de estrellas
+function limpiarTemporazadoresEstrellas() {
+  Object.values(estrellasTimers).forEach((timer) => clearTimeout(timer));
+  estrellasTimers = {};
 }
 
 // Función para inicializar estrellas al comienzo del juego
 function inicializarEstrellas() {
+  // Limpiar temporizadores antiguos
+  limpiarTemporazadoresEstrellas();
+
   pedres = []; // Limpiar estrellas existentes
 
   // Generar un número inicial de estrellas (MAXPED)
@@ -791,20 +1011,29 @@ function manejarColisionEstrella(jugadorId, estrellaId) {
   const estrellaIndex = pedres.findIndex((e) => e.id === estrellaId);
   if (estrellaIndex === -1) return false; // La estrella no existe
 
-  // Verificar la colisión
+  // Obtener la estrella antes de eliminarla para enviar sus coordenadas
   const estrella = pedres[estrellaIndex];
+
+  // Verificar la colisión
   if (detectarColision(jugador, estrella)) {
     // Incrementar la puntuación del jugador
     if (!jugador.puntuacion) jugador.puntuacion = 0;
     jugador.puntuacion++;
 
+    // Cancelar el temporizador de esta estrella ya que fue recogida
+    if (estrellasTimers[estrellaId]) {
+      clearTimeout(estrellasTimers[estrellaId]);
+      delete estrellasTimers[estrellaId];
+    }
+
     // Eliminar la estrella
     pedres.splice(estrellaIndex, 1);
 
     // Generar una nueva estrella
-    pedres.push(generarEstrella());
+    const nuevaEstrella = generarEstrella();
+    pedres.push(nuevaEstrella);
 
-    // Enviar un mensaje a todos los clientes
+    // Enviar un mensaje a todos los clientes con la información de la colisión
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(
@@ -840,4 +1069,27 @@ function manejarColisionEstrella(jugadorId, estrellaId) {
   }
 
   return false;
+}
+
+// Función para detectar colisiones entre jugadores y estrellas usando hitbox cuadrada
+function detectarColision(jugador, estrella) {
+  // Usar hitbox cuadrada (AABB - Axis-Aligned Bounding Box)
+  // Comprobar si hay solapamiento en ambos ejes
+  const naveIzquierda = jugador.x;
+  const naveDerecha = jugador.x + MIDAJ;
+  const naveArriba = jugador.y;
+  const naveAbajo = jugador.y + MIDAJ;
+
+  const estrellaIzquierda = estrella.x;
+  const estrellaDerecha = estrella.x + MIDAP;
+  const estrellaArriba = estrella.y;
+  const estrellaAbajo = estrella.y + MIDAP;
+
+  // Hay colisión cuando no hay separación entre los rectángulos
+  return (
+    naveIzquierda < estrellaDerecha &&
+    naveDerecha > estrellaIzquierda &&
+    naveArriba < estrellaAbajo &&
+    naveAbajo > estrellaArriba
+  );
 }

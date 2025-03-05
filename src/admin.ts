@@ -1,7 +1,15 @@
 "use strict";
 
 // Importamos los tipos y funciones desde pyramid.ts
-import { Jugador, Pedra, Config, dibuixar, configurar } from "./pyramid.js";
+import {
+  Jugador,
+  Pedra,
+  Config,
+  dibuixar,
+  configurar,
+  actualizarTemporizador, // Añadimos la importación para el temporizador
+  detenerTemporizador, // Importamos también la función para detener el temporizador
+} from "./pyramid.js";
 
 /*************************************************
  * EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
@@ -25,11 +33,18 @@ interface GameStateMessage {
   punts?: number[];
 }
 
+// Añadimos la interfaz para mensajes de tiempo
+interface TimeUpdateMessage {
+  type: "timeUpdate";
+  remainingTime: number;
+}
+
 // Unión de todos los tipos de mensajes posibles
 type WebSocketMessage =
   | ConfigMessage
   | CommandMessage
   | GameStateMessage
+  | TimeUpdateMessage
   | { type: string; [key: string]: any };
 
 let ws: WebSocket;
@@ -52,7 +67,12 @@ function setConfig(): void {
     (document.getElementById("scoreLimit") as HTMLInputElement)?.value || "10"
   );
 
-  if (isNaN(width) || isNaN(height) || isNaN(scoreLimit)) {
+  // Obtener el tiempo límite
+  const timeLimit = parseInt(
+    (document.getElementById("timeLimit") as HTMLInputElement)?.value || "0"
+  );
+
+  if (isNaN(width) || isNaN(height) || isNaN(scoreLimit) || isNaN(timeLimit)) {
     alert("Si us plau, introdueix valors numèrics vàlids");
     return;
   }
@@ -64,7 +84,8 @@ function setConfig(): void {
     height < 480 ||
     height > 960 ||
     scoreLimit < 1 ||
-    scoreLimit > 50
+    scoreLimit > 50 ||
+    (timeLimit !== 0 && (timeLimit < 30 || timeLimit > 600))
   ) {
     alert("Valors fora de rang. Si us plau, revisa les dades.");
     return;
@@ -77,6 +98,7 @@ function setConfig(): void {
       width: width,
       height: height,
       scoreLimit: scoreLimit,
+      timeLimit: timeLimit > 0 ? timeLimit : undefined, // Solo enviar si es mayor que 0
     },
   };
 
@@ -193,6 +215,19 @@ function init(): void {
         // Canvia el text del botó a 'Engegar' quan el joc s'atura
         (document.getElementById("engegar") as HTMLButtonElement).textContent =
           "Engegar";
+
+        // Detener el temporizador cuando se detiene el juego
+        detenerTemporizador();
+        break;
+      case "timeUpdate":
+        // Añadimos el procesamiento de los mensajes de actualización de tiempo
+        const timeUpdateMsg = message as TimeUpdateMessage;
+        console.log(
+          `⏱️ Tiempo restante: ${timeUpdateMsg.remainingTime} segundos`
+        );
+
+        // Actualizar el temporizador con el tiempo recibido
+        actualizarTemporizador(timeUpdateMsg.remainingTime);
         break;
       case "starCollision":
         // Registrar cuando un jugador recoge una estrella

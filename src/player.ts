@@ -72,6 +72,26 @@ interface StarCollisionMessage extends BaseMessage {
   nuevaPuntuacion: number;
 }
 
+// Nuevas interfaces para mensajes relacionados con el tiempo
+interface TimeUpMessage extends BaseMessage {
+  type: "timeUp";
+  empate: boolean;
+  ganadorId: number | null;
+  maximaPuntuacion: number;
+}
+
+// Nueva interfaz para actualización de tiempo
+interface TimeUpdateMessage extends BaseMessage {
+  type: "timeUpdate";
+  remainingTime: number;
+}
+
+// Nuevas interfaces para los mensajes relacionados con estrellas
+interface StarDisappearMessage extends BaseMessage {
+  type: "starDisappear";
+  estrellaId: number;
+}
+
 // Tipos e interfaces adicionales
 // Ampliamos las direcciones incluyendo las diagonales
 type Direction =
@@ -389,8 +409,8 @@ function init(): void {
                       })
                     );
 
-                    // Mostrar efecto visual de recolección
-                    mostrarEfectoRecoleccion(estrella.x, estrella.y);
+                    // Ya no mostramos aquí el efecto de recolección
+                    // Lo mostraremos cuando el servidor confirme la recolección
                   }
                 }
               });
@@ -423,10 +443,29 @@ function init(): void {
 
         case "engegar":
           console.log("🎮 Joc iniciat");
+          // Cuando se inicia el juego, mostraremos el temporizador cuando el servidor envíe el primer timeUpdate
           break;
+
         case "aturar":
           console.log("⏹️ Joc aturat");
+          // Cuando se detiene el juego, detenemos el temporizador local
+          import("./pyramid.js").then((module) => {
+            module.detenerTemporizador();
+          });
           break;
+
+        case "timeUpdate":
+          const timeUpdateMsg = message as TimeUpdateMessage;
+          console.log(
+            `⏱️ Tiempo restante: ${timeUpdateMsg.remainingTime} segundos`
+          );
+
+          // Actualizar el temporizador local con el tiempo del servidor
+          import("./pyramid.js").then((module) => {
+            module.actualizarTemporizador(timeUpdateMsg.remainingTime);
+          });
+          break;
+
         case "missatge":
           const msgMsg = message as MessageMessage;
           console.log("💬 Missatge del servidor:", msgMsg.text);
@@ -459,18 +498,54 @@ function init(): void {
             );
           }
 
-          // Buscar la estrella con la que colisionamos para mostrar un efecto aunque no seamos nosotros
-          // Esto es importante para visualizar correctamente cuando otros jugadores recogen estrellas
+          // Buscar la estrella con la que colisionamos para mostrar el efecto
           const estrella = document.getElementById(
             `estrella-${starMsg.estrellaId}`
           );
+
           if (estrella) {
             // Extraer las coordenadas para el efecto
             const x = parseFloat(estrella.getAttribute("x") || "0");
             const y = parseFloat(estrella.getAttribute("y") || "0");
 
-            // Mostrar animación de recolección
+            // Mostrar animación de recolección EN ESTE MOMENTO cuando el servidor confirma la colisión
             mostrarEfectoRecoleccion(x, y);
+          }
+          break;
+
+        case "timeUp":
+          const timeUpMsg = message as TimeUpMessage;
+          if (timeUpMsg.empate) {
+            console.log(
+              "⏰ ¡Tiempo agotado! La partida ha terminado en empate."
+            );
+          } else if (timeUpMsg.ganadorId !== null) {
+            console.log(
+              `⏰ ¡Tiempo agotado! Gana el jugador ${timeUpMsg.ganadorId} con ${timeUpMsg.maximaPuntuacion} puntos.`
+            );
+          } else {
+            console.log("⏰ ¡Tiempo agotado! La partida ha terminado.");
+          }
+          break;
+
+        case "starDisappear":
+          const disappearMsg = message as StarDisappearMessage;
+          console.log(`⭐ La estrella ${disappearMsg.estrellaId} desapareció`);
+
+          // Buscar la estrella que desapareció para mostrar el efecto
+          const estrellaDesaparecida = document.getElementById(
+            `estrella-${disappearMsg.estrellaId}`
+          );
+
+          if (estrellaDesaparecida) {
+            // Extraer las coordenadas para el efecto
+            const x = parseFloat(estrellaDesaparecida.getAttribute("x") || "0");
+            const y = parseFloat(estrellaDesaparecida.getAttribute("y") || "0");
+
+            // Mostrar animación de desvanecimiento
+            import("./pyramid.js").then((module) => {
+              module.mostrarEfectoDesvanecimiento(x, y);
+            });
           }
           break;
 
