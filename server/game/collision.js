@@ -1,13 +1,11 @@
-/**
- * Utilidades para la detección de colisiones
- */
+/* Utilitats per a la detecció de col·lisions */
 
 const gameConfig = require("../config/game-config");
 
 const collisionDetector = {
-  // Detección de colisión entre jugador y estrella
+  // Detecta col·lisió entre jugador i estrella
   detectPlayerStarCollision: (jugador, estrella) => {
-    // Usamos hitbox cuadrada (AABB - Axis-Aligned Bounding Box)
+    // Fem servir hitbox quadrada (AABB)
     const naveIzquierda = jugador.x;
     const naveDerecha = jugador.x + gameConfig.MIDAJ;
     const naveArriba = jugador.y;
@@ -18,7 +16,7 @@ const collisionDetector = {
     const estrellaArriba = estrella.y;
     const estrellaAbajo = estrella.y + gameConfig.MIDAP;
 
-    // Hay colisión cuando no hay separación entre los rectángulos
+    // Hi ha col·lisió quan no hi ha separació
     return (
       naveIzquierda < estrellaDerecha &&
       naveDerecha > estrellaIzquierda &&
@@ -27,7 +25,7 @@ const collisionDetector = {
     );
   },
 
-  // Verifica si una posición está dentro de una zona de construcción de pirámide
+  // Comprova si una posició està dins d'una zona de piràmide
   isInPyramidZone: (x, y) => {
     const config = gameConfig.getConfig();
     return (
@@ -36,7 +34,7 @@ const collisionDetector = {
     );
   },
 
-  // Verifica si una posición está en la zona del equipo especificado
+  // Comprova si una posició és a la zona d'un equip
   isInTeamZone: (x, y, team) => {
     const config = gameConfig.getConfig();
     if (team === 0) {
@@ -49,7 +47,7 @@ const collisionDetector = {
     }
   },
 
-  // Verifica si un movimiento es válido (no sale del área de juego)
+  // Comprova si el moviment és vàlid dins l'àrea de joc
   isValidMove: (x, y) => {
     const config = gameConfig.getConfig();
     return (

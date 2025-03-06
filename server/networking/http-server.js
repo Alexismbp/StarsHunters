@@ -1,13 +1,10 @@
-/**
- * Servidor HTTP para servir archivos estáticos
- */
-
+// Servidor HTTP per servir arxius estàtics
 const http = require("http");
 const url = require("url");
 const fs = require("fs");
 const path = require("path");
 
-// Función para determinar el tipo MIME según la extensión
+// Determina el tipus MIME segons l'extensió de l'arxiu
 function getMimeType(filename) {
   const extension = filename.split(".").pop().toLowerCase();
   const mimeTypes = {
@@ -25,6 +22,7 @@ function getMimeType(filename) {
   return mimeTypes[extension] || "application/octet-stream";
 }
 
+// Configura les capçaleres de la resposta HTTP
 function header(resposta, codi, cType) {
   resposta.setHeader("Access-Control-Allow-Origin", "*");
   resposta.setHeader("Access-Control-Allow-Methods", "GET");
@@ -32,6 +30,7 @@ function header(resposta, codi, cType) {
   else resposta.writeHead(codi);
 }
 
+// Envia l'arxiu al client
 function enviarArxiu(resposta, dades, filename, cType, err) {
   if (err) {
     header(resposta, 400, "text/html");
@@ -46,6 +45,7 @@ function enviarArxiu(resposta, dades, filename, cType, err) {
   resposta.end();
 }
 
+// Gestiona les peticions HTTP
 function onRequest(peticio, resposta) {
   let cosPeticio = "";
 
@@ -67,12 +67,12 @@ function onRequest(peticio, resposta) {
 
         if (filename == "./") filename += "index.html";
 
-        // Buscar en la raíz del proyecto
+        // Busca a l'arrel del projecte
         const rootPath = path.join(__dirname, "../..");
         const filePath = path.join(rootPath, filename.substring(1));
 
         if (fs.existsSync(filePath)) {
-          // Determinar el tipo MIME según la extensión del archivo
+          // Determina el tipus MIME segons l'extensió
           const mimeType = getMimeType(filePath);
           console.log(`Sirviendo ${filePath} con tipo MIME: ${mimeType}`);
 
@@ -89,7 +89,7 @@ function onRequest(peticio, resposta) {
     });
 }
 
-// Exportamos las funciones que necesitamos
+// Exporta les funcions necessàries
 module.exports = {
   start: (port) => {
     const server = http.createServer();

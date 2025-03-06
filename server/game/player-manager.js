@@ -1,13 +1,11 @@
-/**
- * Gestión de jugadores
- */
+// Gestor de jugadors
 
 const gameConfig = require("../config/game-config");
 
-// Variables de estado
+// Variables d'estat
 let players = {};
 let playerIdCounter = 0;
-let puntos = [0, 0]; // Puntuación de cada equipo
+let puntos = [0, 0]; // Puntuació dels equips
 
 const playerManager = {
   // Getters
@@ -19,11 +17,10 @@ const playerManager = {
   getPlayerCount: () => Object.keys(players).length,
   getPoints: () => [...puntos],
 
-  // Crear un nuevo jugador
   createPlayer: (ws) => {
     const playerId = playerIdCounter++;
 
-    // Contar jugadores de cada equipo para equilibrar
+    // Comptem jugadors per equilibrar equips
     let team0Count = 0,
       team1Count = 0;
     Object.values(players).forEach((player) => {
@@ -31,32 +28,30 @@ const playerManager = {
       else team1Count++;
     });
 
-    // Asignar equipo basado en el balance actual
     const team = team0Count <= team1Count ? 0 : 1;
     const config = gameConfig.getConfig();
 
-    // Determinar posición inicial según el ID
+    // Posició inicial segons ID
     let posicionX, posicionY;
     switch (playerId % 4) {
-      case 0: // Esquina superior izquierda
+      case 0: // Cantonada superior esquerra
         posicionX = 0;
         posicionY = 0;
         break;
-      case 1: // Esquina inferior derecha
+      case 1: // Cantonada inferior dreta
         posicionX = config.width - 8 * gameConfig.ESCALA;
         posicionY = config.height - 8 * gameConfig.ESCALA;
         break;
-      case 2: // Esquina superior derecha
+      case 2: // Cantonada superior dreta
         posicionX = config.width - 8 * gameConfig.ESCALA;
         posicionY = 0;
         break;
-      case 3: // Esquina inferior izquierda
+      case 3: // Cantonada inferior esquerra
         posicionX = 0;
         posicionY = config.height - 8 * gameConfig.ESCALA;
         break;
     }
 
-    // Crear el jugador
     players[playerId] = {
       id: playerId,
       ws: ws,
@@ -70,7 +65,6 @@ const playerManager = {
     return players[playerId];
   },
 
-  // Eliminar un jugador
   removePlayer: (id) => {
     if (players[id]) {
       delete players[id];
@@ -79,7 +73,6 @@ const playerManager = {
     return false;
   },
 
-  // Resetear todos los jugadores
   resetPlayers: () => {
     const config = gameConfig.getConfig();
 
@@ -87,21 +80,21 @@ const playerManager = {
       jugador.puntuacion = 0;
       jugador.direction = null;
 
-      // Reposicionar según ID
+      // Reposicionem segons ID
       switch (parseInt(jugador.id) % 4) {
-        case 0: // Esquina superior izquierda
+        case 0: // Cantonada superior esquerra
           jugador.x = 0;
           jugador.y = 0;
           break;
-        case 1: // Esquina inferior derecha
+        case 1: // Cantonada inferior dreta
           jugador.x = config.width - 8 * gameConfig.ESCALA;
           jugador.y = config.height - 8 * gameConfig.ESCALA;
           break;
-        case 2: // Esquina superior derecha
+        case 2: // Cantonada superior dreta
           jugador.x = config.width - 8 * gameConfig.ESCALA;
           jugador.y = 0;
           break;
-        case 3: // Esquina inferior izquierda
+        case 3: // Cantonada inferior esquerra
           jugador.x = 0;
           jugador.y = config.height - 8 * gameConfig.ESCALA;
           break;
@@ -110,11 +103,9 @@ const playerManager = {
       delete jugador.stone;
     });
 
-    // Resetear puntuaciones
     puntos = [0, 0];
   },
 
-  // Actualizar dirección de un jugador
   updatePlayerDirection: (playerId, direction, angle) => {
     const player = players[playerId];
     if (player) {
@@ -127,7 +118,6 @@ const playerManager = {
     return false;
   },
 
-  // Incrementar puntuación de un jugador
   incrementPlayerScore: (playerId) => {
     const player = players[playerId];
     if (player) {
@@ -138,7 +128,6 @@ const playerManager = {
     return 0;
   },
 
-  // Verificar si un jugador ha ganado según la config
   checkWinCondition: (playerId) => {
     const player = players[playerId];
     const config = gameConfig.getConfig();

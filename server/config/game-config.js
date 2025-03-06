@@ -1,24 +1,21 @@
-/**
- * Configuración centralizada del juego
- * Contiene todas las constantes y configuraciones del juego
- */
+// Configuració centralitzada del joc
 
-// Factor de escala
+// Factor d'escala
 const ESCALA = 4;
 
-// Constantes del juego
-const MAXPED = 8; // Número máximo de estrellas en pantalla
-const INCHV = ESCALA; // Incremento del desplazamiento
-const MIDAJ = 4 * ESCALA; // Tamaño del jugador
-const MIDAP = 2 * ESCALA; // Tamaño de las estrellas
+// Constants bàsiques
+const MAXPED = 8; // Màxim d'estrelles
+const INCHV = ESCALA;
+const MIDAJ = 4 * ESCALA; // Mida jugador
+const MIDAP = 2 * ESCALA; // Mida estrelles
 
-// Dimensiones del área de juego
+// Dimensions àrea de joc
 const MINH = 40 * MIDAJ;
 const MAXH = 2 * MINH;
 const MINV = 30 * MIDAJ;
 const MAXV = 2 * MINV;
 
-// Configuración de la pirámide
+// Piràmide
 const NFPMIN = 4;
 const NFPMAX = 8;
 const PH = 4 * ESCALA;
@@ -26,21 +23,21 @@ const PV = 3 * ESCALA;
 const PHMAX = PH * NFPMAX;
 const PVMAX = PV * NFPMAX;
 
-// Tiempo entre cada movimiento (ms)
+// Temps entre moviments (ms)
 const TEMPS = 100;
 
-// Configuración por defecto del juego
+// Configuració per defecte
 let config = {
   width: MINH,
   height: MINV,
   pisos: NFPMIN,
   pedres: ((NFPMIN + 1) * NFPMIN) / 2,
-  scoreLimit: 10, // Puntuación para ganar
-  timeLimit: 0, // Sin límite de tiempo por defecto
+  scoreLimit: 10, // Puntuació per guanyar
+  timeLimit: 0, // Sense límit de temps
 };
 
 const gameConfig = {
-  // Constantes
+  // Constants
   ESCALA,
   MAXPED,
   INCHV,
@@ -58,10 +55,10 @@ const gameConfig = {
   PVMAX,
   TEMPS,
 
-  // Métodos para acceder y modificar la configuración
+  // Mètodes de configuració
   getConfig: () => ({ ...config }),
   updateConfig: (newConfig) => {
-    // Validar los valores antes de actualizar
+    // Validació de valors
     if (
       newConfig.width < MINH ||
       newConfig.width > MAXH ||

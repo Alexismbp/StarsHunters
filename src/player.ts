@@ -1,6 +1,5 @@
 "use strict";
 
-// Importamos las funciones y tipos desde pyramid.ts
 import {
   Jugador as Player,
   Pedra as Stone,
@@ -8,11 +7,11 @@ import {
   configurar,
   dibuixar,
   setId,
-  detectarColision, // Añadimos la importación de detectarColision
-  mostrarEfectoRecoleccion, // Importamos también la función de efectos
+  detectarColision,
+  mostrarEfectoRecoleccion,
 } from "./pyramid.js";
 
-// Interfaces para mensajes
+// Interfícies per a missatges
 interface BaseMessage {
   type: string;
 }
@@ -25,7 +24,7 @@ interface DirectionMessage extends BaseMessage {
   type: "direccio";
   id: number;
   direction: Direction;
-  angle?: number; // Añadimos el ángulo al mensaje de dirección
+  angle?: number;
 }
 
 interface CollectStarMessage extends BaseMessage {
@@ -64,7 +63,6 @@ interface WinnerMessage extends BaseMessage {
   id: string | number;
 }
 
-// Interfaces para mensajes adicionales para colisiones con estrellas
 interface StarCollisionMessage extends BaseMessage {
   type: "starCollision";
   jugadorId: string | number;
@@ -72,7 +70,6 @@ interface StarCollisionMessage extends BaseMessage {
   nuevaPuntuacion: number;
 }
 
-// Nuevas interfaces para mensajes relacionados con el tiempo
 interface TimeUpMessage extends BaseMessage {
   type: "timeUp";
   empate: boolean;
@@ -80,20 +77,17 @@ interface TimeUpMessage extends BaseMessage {
   maximaPuntuacion: number;
 }
 
-// Nueva interfaz para actualización de tiempo
 interface TimeUpdateMessage extends BaseMessage {
   type: "timeUpdate";
   remainingTime: number;
 }
 
-// Nuevas interfaces para los mensajes relacionados con estrellas
 interface StarDisappearMessage extends BaseMessage {
   type: "starDisappear";
   estrellaId: number;
 }
 
-// Tipos e interfaces adicionales
-// Ampliamos las direcciones incluyendo las diagonales
+// Tipus de direccions possibles incloent diagonals
 type Direction =
   | "up"
   | "down"
@@ -105,17 +99,13 @@ type Direction =
   | "down-right"
   | null;
 
-// Variables globales
+// Variables globals
 let ws: WebSocket | null = null;
 let playerId: number | null = null;
 let currentDirection: Direction = null;
-let currentAngle: number = 0; // Nueva variable para mantener el ángulo actual
+let currentAngle: number = 0;
 
-// Eliminamos las variables de intervalo ya que no las usaremos
-// let moveInterval: number | null = null;
-// let diagonalInterval: number | null = null;
-
-// Objeto para rastrear qué teclas están actualmente presionadas
+// Objecte per a rastrejar quines tecles estan pressionades
 const keysPressed: { [key: string]: boolean } = {
   up: false,
   down: false,
@@ -123,45 +113,31 @@ const keysPressed: { [key: string]: boolean } = {
   right: false,
 };
 
-// Añadimos un conjunto para rastrear las estrellas con las que hemos colisionado
-// para evitar enviar múltiples eventos para la misma colisión
+// Conjunt per evitar múltiples col·lisions amb la mateixa estrella
 const colisionesEstrellas = new Set<number>();
 
-/*************************************************
- * EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
- *************************************************/
-
-///////////////////////////////////////////////////////////
-// ALUMNE: Alexis Boisset, Biel Martínez
-///////////////////////////////////////////////////////////
-
-// Función para calcular el ángulo según la dirección
+// Funció per calcular l'angle segons la direcció
 function getAngleFromDirection(): number {
-  // Movimiento diagonal
-  if (keysPressed.up && keysPressed.right) return 225; // Invertido de 45 a 225
-  if (keysPressed.down && keysPressed.right) return 315; // Invertido de 135 a 315
-  if (keysPressed.down && keysPressed.left) return 45; // Invertido de 225 a 45
-  if (keysPressed.up && keysPressed.left) return 135; // Invertido de 315 a 135
+  if (keysPressed.up && keysPressed.right) return 225;
+  if (keysPressed.down && keysPressed.right) return 315;
+  if (keysPressed.down && keysPressed.left) return 45;
+  if (keysPressed.up && keysPressed.left) return 135;
 
-  // Movimiento simple
-  if (keysPressed.up) return 180; // Invertido de 0 a 180
-  if (keysPressed.right) return 270; // Invertido de 90 a 270
-  if (keysPressed.down) return 0; // Invertido de 180 a 0
-  if (keysPressed.left) return 90; // Invertido de 270 a 90
+  if (keysPressed.up) return 180;
+  if (keysPressed.right) return 270;
+  if (keysPressed.down) return 0;
+  if (keysPressed.left) return 90;
 
-  // Si no hay movimiento, mantener el último ángulo conocido
   return currentAngle;
 }
 
-// Calcular la dirección basada en las teclas presionadas, incluidas las diagonales
+// Calcula la direcció principal basada en les tecles pressionades
 function calculateMainDirection(): Direction {
-  // Primero comprobamos las diagonales
   if (keysPressed.up && keysPressed.left) return "up-left";
   if (keysPressed.up && keysPressed.right) return "up-right";
   if (keysPressed.down && keysPressed.left) return "down-left";
   if (keysPressed.down && keysPressed.right) return "down-right";
 
-  // Luego las direcciones simples
   if (keysPressed.up) return "up";
   if (keysPressed.down) return "down";
   if (keysPressed.left) return "left";
@@ -170,20 +146,17 @@ function calculateMainDirection(): Direction {
   return null;
 }
 
-// Enviar una dirección al servidor
+// Envia la direcció al servidor
 function sendDirection(): void {
   if (!ws || ws.readyState !== WebSocket.OPEN || playerId === null) {
     return;
   }
 
-  // Calcular la dirección principal según las teclas presionadas
   const direction = calculateMainDirection();
 
-  // Actualizar la dirección actual y el ángulo
   currentDirection = direction;
   currentAngle = getAngleFromDirection();
 
-  // Enviar mensaje al servidor con la dirección y el ángulo
   ws.send(
     JSON.stringify({
       type: "direccio",
@@ -194,16 +167,14 @@ function sendDirection(): void {
   );
 }
 
-// Manejador para cuando se suelta una tecla
+// Gestiona quan es deixa de prémer una tecla
 function aturarMoviment(ev: KeyboardEvent): void {
   if (!ws || ws.readyState !== WebSocket.OPEN || playerId === null) {
     return;
   }
 
-  // Estado anterior de teclas para comparar si hay cambios
   const prevState = { ...keysPressed };
 
-  // Actualizar el estado de las teclas cuando se sueltan
   switch (ev.key) {
     case "ArrowUp":
     case "w":
@@ -227,32 +198,27 @@ function aturarMoviment(ev: KeyboardEvent): void {
       break;
   }
 
-  // Verificar si hay cambios en el estado de las teclas
   const directionChanged =
     prevState.up !== keysPressed.up ||
     prevState.down !== keysPressed.down ||
     prevState.left !== keysPressed.left ||
     prevState.right !== keysPressed.right;
 
-  // Solo enviar dirección si ha cambiado el estado de las teclas
   if (directionChanged) {
     sendDirection();
   }
 }
 
-// Gestor de l'esdeveniment per les tecles
+// Gestiona quan es prem una tecla
 function direccio(ev: KeyboardEvent): void {
   if (!ws || ws.readyState !== WebSocket.OPEN || playerId === null) {
     return;
   }
 
-  // Evitar repetición si la tecla ya está presionada
   if (ev.repeat) return;
 
-  // Estado anterior de teclas para comparar si hay cambios
   const prevState = { ...keysPressed };
 
-  // Actualizar el estado de las teclas cuando se presionan
   switch (ev.key) {
     case "ArrowUp":
     case "w":
@@ -275,72 +241,53 @@ function direccio(ev: KeyboardEvent): void {
       keysPressed.right = true;
       break;
     default:
-      return; // Si no es una tecla relevante, no hacer nada más
+      return;
   }
 
-  // Verificar si hay cambios en el estado de las teclas
   const directionChanged =
     prevState.up !== keysPressed.up ||
     prevState.down !== keysPressed.down ||
     prevState.left !== keysPressed.left ||
     prevState.right !== keysPressed.right;
 
-  // Solo enviar dirección si ha cambiado el estado de las teclas
   if (directionChanged) {
     sendDirection();
   }
 }
 
-// Establir la connexió amb el servidor en el port 8180
+// Inicialitza la connexió amb el servidor
 function init(): void {
-  // Inicialitzar la connexió WebSocket
-  console.log("🚀 Inicialitzant connexió WebSocket...");
   ws = new WebSocket("ws://localhost:8180");
 
   ws.onopen = function (): void {
-    // Enviar missatge de nou jugador
-    console.log("✅ Connexió establerta amb el servidor");
-    console.log("📤 Enviant petició de nou jugador");
     if (ws) {
       ws.send(JSON.stringify({ type: "player" }));
     }
   };
 
   ws.onclose = function (): void {
-    // Tancar la connexió
-    console.log("❌ Connexió tancada");
     alert("Connexió tancada. Tornant a la pàgina principal.");
     window.location.href = "index.html";
   };
 
   ws.onerror = function (error: Event): void {
-    // Mostrar error i tancar la connexió
-    console.log("❌ Error en la connexió:", error);
     alert("Error en la connexió");
     window.location.href = "index.html";
   };
 
   ws.onmessage = function (event: MessageEvent): void {
-    // Processar missatges rebuts
     try {
       const message = JSON.parse(event.data) as BaseMessage;
-      console.log("📩 Missatge rebut:", message);
 
       switch (message.type) {
-        // Processar missatges segons el tipus
         case "connectat":
           const connectedMsg = message as ConnectedMessage;
           playerId = connectedMsg.id;
-          // Establecer el ID en pyramid.ts
           setId(playerId);
-          console.log("✅ Connectat com a jugador", playerId);
 
-          // Aplicar configuración inicial
           if (connectedMsg.config) {
-            console.log("⚙️ Configuració inicial rebuda:", connectedMsg.config);
             configurar(connectedMsg.config);
 
-            // Mostrar el límite de puntuación si existe en la interfaz
             const scoreLimitInput = document.getElementById(
               "scoreLimit"
             ) as HTMLInputElement;
@@ -351,16 +298,12 @@ function init(): void {
           break;
 
         case "config":
-          // Actualitzar la configuració del joc
           const configMsg = message as ConfigMessage;
           if (!configMsg.data || typeof configMsg.data !== "object") {
-            console.error("❌ Dades de configuració invàlides");
             return;
           }
-          console.log("⚙️ Nova configuració rebuda:", configMsg.data);
           configurar(configMsg.data);
 
-          // Mostrar el límite de puntuación si existe en la interfaz
           const scoreLimitInput = document.getElementById(
             "scoreLimit"
           ) as HTMLInputElement;
@@ -371,15 +314,9 @@ function init(): void {
 
         case "dibuixar":
           const drawMsg = message as DrawMessage;
-          console.log("🎨 Actualitzant estat del joc:", {
-            jugadors: drawMsg.jugadors?.length || 0,
-            pedres: drawMsg.pedres?.length || 0,
-          });
 
-          // Ahora dibuixar sólo recibe dos parámetros: jugadores y piedras
           dibuixar(drawMsg.jugadors || [], drawMsg.pedres || []);
 
-          // Comprobar si hay colisiones entre la nave del jugador actual y alguna estrella
           if (playerId !== null) {
             const jugadorActual = drawMsg.jugadors?.find(
               (j) => j.id === playerId
@@ -390,17 +327,9 @@ function init(): void {
                   estrella.id !== undefined &&
                   detectarColision(jugadorActual, estrella)
                 ) {
-                  // Solo enviar un mensaje de colisión si no hemos colisionado ya con esta estrella
                   if (!colisionesEstrellas.has(estrella.id)) {
-                    console.log(
-                      `Colisión detectada con estrella ${estrella.id}`
-                    );
-
-                    // Almacenar esta colisión para evitar duplicados
                     colisionesEstrellas.add(estrella.id);
 
-                    // Enviar mensaje de colisión al servidor
-                    // El servidor debe eliminar esta estrella y crear una nueva
                     ws!.send(
                       JSON.stringify({
                         type: "starCollision",
@@ -408,17 +337,12 @@ function init(): void {
                         estrellaId: estrella.id,
                       })
                     );
-
-                    // Ya no mostramos aquí el efecto de recolección
-                    // Lo mostraremos cuando el servidor confirme la recolección
                   }
                 }
               });
             }
           }
 
-          // Limpiamos el conjunto de colisiones para las estrellas que ya no existen
-          // Esto evita que el conjunto crezca indefinidamente
           if (drawMsg.pedres) {
             const estrellasActualesIds = new Set<number>();
             drawMsg.pedres.forEach((p) => {
@@ -427,7 +351,6 @@ function init(): void {
               }
             });
 
-            // Eliminar IDs de estrellas que ya no existen en el juego
             colisionesEstrellas.forEach((id) => {
               if (!estrellasActualesIds.has(id)) {
                 colisionesEstrellas.delete(id);
@@ -438,17 +361,12 @@ function init(): void {
 
         case "ganador":
           const winnerMsg = message as WinnerMessage;
-          console.log(`🏆 El jugador ${winnerMsg.id} ha ganado el juego!`);
           break;
 
         case "engegar":
-          console.log("🎮 Joc iniciat");
-          // Cuando se inicia el juego, mostraremos el temporizador cuando el servidor envíe el primer timeUpdate
           break;
 
         case "aturar":
-          console.log("⏹️ Joc aturat");
-          // Cuando se detiene el juego, detenemos el temporizador local
           import("./pyramid.js").then((module) => {
             module.detenerTemporizador();
           });
@@ -456,11 +374,7 @@ function init(): void {
 
         case "timeUpdate":
           const timeUpdateMsg = message as TimeUpdateMessage;
-          console.log(
-            `⏱️ Tiempo restante: ${timeUpdateMsg.remainingTime} segundos`
-          );
 
-          // Actualizar el temporizador local con el tiempo del servidor
           import("./pyramid.js").then((module) => {
             module.actualizarTemporizador(timeUpdateMsg.remainingTime);
           });
@@ -468,81 +382,47 @@ function init(): void {
 
         case "missatge":
           const msgMsg = message as MessageMessage;
-          console.log("💬 Missatge del servidor:", msgMsg.text);
           break;
         case "colision":
-          // Si hay colisión, aturar el movimiento
           currentDirection = null;
 
-          // Reiniciar estado de teclas al detectar colisión
           Object.keys(keysPressed).forEach((key) => {
             keysPressed[key as keyof typeof keysPressed] = false;
           });
 
-          // Informar al servidor que ya no hay dirección de movimiento
           sendDirection();
           break;
 
-        // Nuevo tipo de mensaje para colisiones con estrellas
         case "starCollision":
           const starMsg = message as StarCollisionMessage;
-          console.log(
-            `⭐ Jugador ${starMsg.jugadorId} ha recogido una estrella. Nueva puntuación: ${starMsg.nuevaPuntuacion}`
-          );
 
-          // Si somos nosotros, mostrar un mensaje más destacado
-          if (playerId === starMsg.jugadorId) {
-            console.log(
-              "%c¡Has recogido una estrella! +1 punto",
-              "color: yellow; background-color: black; font-size: 16px; padding: 5px;"
-            );
-          }
-
-          // Buscar la estrella con la que colisionamos para mostrar el efecto
           const estrella = document.getElementById(
             `estrella-${starMsg.estrellaId}`
           );
 
           if (estrella) {
-            // Extraer las coordenadas para el efecto
             const x = parseFloat(estrella.getAttribute("x") || "0");
             const y = parseFloat(estrella.getAttribute("y") || "0");
 
-            // Mostrar animación de recolección EN ESTE MOMENTO cuando el servidor confirma la colisión
             mostrarEfectoRecoleccion(x, y);
           }
           break;
 
         case "timeUp":
           const timeUpMsg = message as TimeUpMessage;
-          if (timeUpMsg.empate) {
-            console.log(
-              "⏰ ¡Tiempo agotado! La partida ha terminado en empate."
-            );
-          } else if (timeUpMsg.ganadorId !== null) {
-            console.log(
-              `⏰ ¡Tiempo agotado! Gana el jugador ${timeUpMsg.ganadorId} con ${timeUpMsg.maximaPuntuacion} puntos.`
-            );
-          } else {
-            console.log("⏰ ¡Tiempo agotado! La partida ha terminado.");
-          }
           break;
 
         case "starDisappear":
           const disappearMsg = message as StarDisappearMessage;
-          console.log(`⭐ La estrella ${disappearMsg.estrellaId} desapareció`);
 
-          // Buscar la estrella que desapareció para mostrar el efecto
           const estrellaDesaparecida = document.getElementById(
             `estrella-${disappearMsg.estrellaId}`
           );
 
           if (estrellaDesaparecida) {
-            // Extraer las coordenadas para el efecto
             const x = parseFloat(estrellaDesaparecida.getAttribute("x") || "0");
             const y = parseFloat(estrellaDesaparecida.getAttribute("y") || "0");
 
-            // Mostrar animación de desvanecimiento
             import("./pyramid.js").then((module) => {
               module.mostrarEfectoDesvanecimiento(x, y);
             });
@@ -550,21 +430,12 @@ function init(): void {
           break;
 
         default:
-          console.log("❓ Missatge no processat:", message);
       }
-    } catch (error) {
-      console.error("Error al procesar mensaje:", error);
-    }
+    } catch (error) {}
   };
 
-  // Afegir els gestors d'esdeveniments per les tecles
   document.addEventListener("keydown", direccio);
   document.addEventListener("keyup", aturarMoviment);
-  console.log("✅ Event listeners de teclat afegits");
 }
-
-/***********************************************
- * FINAL DE L'APARTAT ON POTS FER MODIFICACIONS *
- ***********************************************/
 
 window.onload = init;

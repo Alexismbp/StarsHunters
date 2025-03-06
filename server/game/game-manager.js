@@ -1,6 +1,5 @@
 /**
- * Gestor principal del juego
- * Controla el estado del juego, iniciando/deteniendo y actualizando el estado
+ * Gestor principal del joc que controla l'estat, inicialització i actualització
  */
 
 const gameConfig = require("../config/game-config");
@@ -8,7 +7,7 @@ const playerManager = require("./player-manager");
 const starManager = require("./star-manager");
 const collisionDetector = require("./collision.js");
 
-// Variables de estado del juego
+// Variables d'estat del joc
 let gameRunning = false;
 let gameInterval = null;
 let gameTimer = null;
@@ -22,11 +21,9 @@ let onTimeUpdate = null;
 let onGameEnd = null;
 
 const gameManager = {
-  // Getters para el estado
   isGameRunning: () => gameRunning,
   getRemainingTime: () => remainingTime,
 
-  // Configurar callbacks
   setCallbacks: (callbacks) => {
     if (callbacks.onGameUpdate) onGameUpdate = callbacks.onGameUpdate;
     if (callbacks.onPlayerWin) onPlayerWin = callbacks.onPlayerWin;
@@ -34,28 +31,22 @@ const gameManager = {
     if (callbacks.onGameEnd) onGameEnd = callbacks.onGameEnd;
   },
 
-  // Iniciar el juego
   startGame: () => {
     if (gameRunning) return false;
 
-    // Reiniciar el estado del juego
     playerManager.resetPlayers();
     starManager.initializeStars();
     gameRunning = true;
 
-    // Configurar temporizador si hay límite de tiempo
     const config = gameConfig.getConfig();
     if (config.timeLimit && config.timeLimit > 0) {
       remainingTime = config.timeLimit;
 
-      // Notificar tiempo inicial
       if (onTimeUpdate) onTimeUpdate(remainingTime);
 
-      // Iniciar temporizador
       gameTimer = setInterval(() => {
         remainingTime--;
 
-        // Tiempo agotado
         if (remainingTime <= 0) {
           clearInterval(gameTimer);
           gameTimer = null;
@@ -65,30 +56,25 @@ const gameManager = {
             timeUpdateInterval = null;
           }
 
-          // Determinar resultado por tiempo
           gameManager.determineResultByTime();
         }
       }, 1000);
 
-      // Actualizar tiempo periódicamente
       timeUpdateInterval = setInterval(() => {
         if (onTimeUpdate) onTimeUpdate(remainingTime);
       }, 5000);
     }
 
-    // Iniciar bucle principal del juego
     gameInterval = setInterval(gameManager.update, gameConfig.TEMPS);
 
     return true;
   },
 
-  // Detener el juego
   stopGame: () => {
     if (!gameRunning) return false;
 
     gameRunning = false;
 
-    // Limpiar temporizadores
     if (gameInterval) {
       clearInterval(gameInterval);
       gameInterval = null;
@@ -111,25 +97,22 @@ const gameManager = {
     return true;
   },
 
-  // Actualización del juego (bucle principal)
+  // Bucle principal del joc
   update: () => {
     if (!gameRunning) return;
 
-    // Actualizar posiciones de jugadores
     const players = playerManager.getAllPlayers();
     const stars = starManager.getAllStars();
 
-    // Mover cada jugador según su dirección
     players.forEach((player) => {
       if (!player.direction) return;
 
       let newX = player.x;
       let newY = player.y;
 
-      // Factor para movimiento diagonal
+      // Factor per moviment diagonal
       const diagonalFactor = 0.7071;
 
-      // Calcular nueva posición según la dirección
       switch (player.direction) {
         case "up":
           newY -= gameConfig.INCHV;
@@ -161,19 +144,16 @@ const gameManager = {
           break;
       }
 
-      // Verificar que el movimiento es válido
       if (collisionDetector.isValidMove(newX, newY)) {
         player.x = newX;
         player.y = newY;
 
-        // Actualizar posición de la piedra si la lleva
         if (player.stone) {
           player.stone.x = newX;
           player.stone.y = newY;
         }
       }
 
-      // Comprobar colisiones con estrellas
       stars.forEach((estrella) => {
         if (collisionDetector.detectPlayerStarCollision(player, estrella)) {
           gameManager.handleStarCollision(player.id, estrella.id);
@@ -181,14 +161,12 @@ const gameManager = {
       });
     });
 
-    // Asegurar que siempre haya suficientes estrellas
     starManager.ensureStarCount();
 
-    // Notificar actualización del juego
     if (onGameUpdate) onGameUpdate();
   },
 
-  // Manejar colisión entre jugador y estrella
+  // Gestiona col·lisió entre jugador i estrella
   handleStarCollision: (playerId, starId) => {
     const player = playerManager.getPlayer(playerId);
     if (!player) return false;
@@ -196,15 +174,12 @@ const gameManager = {
     const starInfo = starManager.removeStar(starId);
     if (!starInfo) return false;
 
-    // Incrementar puntuación
     const newScore = playerManager.incrementPlayerScore(playerId);
 
-    // Notificar colisión
     if (typeof gameManager.onStarCollision === "function") {
       gameManager.onStarCollision(playerId, starId, newScore, starInfo.newStar);
     }
 
-    // Comprobar condición de victoria
     if (playerManager.checkWinCondition(playerId)) {
       if (onPlayerWin) onPlayerWin(playerId);
       gameManager.stopGame();
@@ -213,11 +188,10 @@ const gameManager = {
     return true;
   },
 
-  // Determinar resultado cuando se agota el tiempo
+  // Determina el resultat quan s'esgota el temps
   determineResultByTime: () => {
-    console.log("⏰ Tiempo agotado");
+    console.log("⏰ Temps esgotat");
 
-    // Encontrar al jugador con más puntos
     const players = playerManager.getAllPlayers();
     let bestPlayer = null;
     let maxScore = -1;
@@ -233,18 +207,16 @@ const gameManager = {
       }
     });
 
-    // Notificar resultado (empate o ganador)
     if (tie) {
-      console.log("🏆 Juego empatado con puntuación: " + maxScore);
+      console.log("🏆 Joc empatat amb puntuació: " + maxScore);
       if (onGameEnd) onGameEnd({ empate: true, maximaPuntuacion: maxScore });
     } else if (bestPlayer) {
       console.log(
-        `🏆 Ganador: Jugador ${bestPlayer.id} con ${maxScore} puntos`
+        `🏆 Guanyador: Jugador ${bestPlayer.id} amb ${maxScore} punts`
       );
       if (onPlayerWin) onPlayerWin(bestPlayer.id, maxScore);
     }
 
-    // Detener el juego en cualquier caso
     gameManager.stopGame();
   },
 };

@@ -1,31 +1,27 @@
 "use strict";
 
-// Importamos los tipos y funciones desde pyramid.ts
+// Importació dels tipus i funcions des de pyramid.ts
 import {
   Jugador,
   Pedra,
   Config,
   dibuixar,
   configurar,
-  actualizarTemporizador, // Añadimos la importación para el temporizador
-  detenerTemporizador, // Importamos también la función para detener el temporizador
+  actualizarTemporizador,
+  detenerTemporizador,
 } from "./pyramid.js";
 
-/*************************************************
- * EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
- *************************************************/
-
-// Definición de interfaces para los tipos de mensajes
+// Definició d'interfícies per als tipus de missatges
 interface ConfigMessage {
   type: "config";
-  data: Config; // Usamos el tipo Config importado
+  data: Config;
 }
 
 interface CommandMessage {
   type: "start" | "stop" | "admin";
 }
 
-// Definiciones para los tipos de datos del juego
+// Definicions per als tipus de dades del joc
 interface GameStateMessage {
   type: "dibuixar";
   jugadors?: Jugador[];
@@ -33,13 +29,13 @@ interface GameStateMessage {
   punts?: number[];
 }
 
-// Añadimos la interfaz para mensajes de tiempo
+// Interfície per a missatges de temps
 interface TimeUpdateMessage {
   type: "timeUpdate";
   remainingTime: number;
 }
 
-// Unión de todos los tipos de mensajes posibles
+// Unió de tots els tipus de missatges possibles
 type WebSocketMessage =
   | ConfigMessage
   | CommandMessage
@@ -49,14 +45,9 @@ type WebSocketMessage =
 
 let ws: WebSocket;
 
-///////////////////////////////////////////////////////////
-// ALUMNE: Alberto González, Biel Martínez
-///////////////////////////////////////////////////////////
-
-// Gestor d'esdeveniment del botó 'Configurar'
-// Enviar missatge 'config' amb les dades per configurar el servidor
+// Funció per enviar la configuració al servidor
 function setConfig(): void {
-  // Obtenir els valors dels camps d'entrada
+  // Obtenció dels valors dels camps d'entrada
   const width = parseInt(
     (document.getElementById("width") as HTMLInputElement).value
   );
@@ -67,7 +58,7 @@ function setConfig(): void {
     (document.getElementById("scoreLimit") as HTMLInputElement)?.value || "10"
   );
 
-  // Obtener el tiempo límite
+  // Obtenció del temps límit
   const timeLimit = parseInt(
     (document.getElementById("timeLimit") as HTMLInputElement)?.value || "0"
   );
@@ -77,7 +68,7 @@ function setConfig(): void {
     return;
   }
 
-  // Verificar que els valors estiguin dins dels rangs permesos
+  // Verificació dels valors
   if (
     width < 640 ||
     width > 1280 ||
@@ -91,18 +82,18 @@ function setConfig(): void {
     return;
   }
 
-  // Crear l'objecte de configuració
+  // Creació de l'objecte de configuració
   const config: ConfigMessage = {
     type: "config",
     data: {
       width: width,
       height: height,
       scoreLimit: scoreLimit,
-      timeLimit: timeLimit > 0 ? timeLimit : undefined, // Solo enviar si es mayor que 0
+      timeLimit: timeLimit > 0 ? timeLimit : undefined,
     },
   };
 
-  // Enviar el missatge al servidor a través del WebSocket
+  // Enviament del missatge al servidor
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(config));
     console.log("Configuració enviada al servidor:", config);
@@ -111,90 +102,68 @@ function setConfig(): void {
   }
 }
 
-// Gestor d'esdeveniment del botó 'Engegar/Aturar'
-// Enviar missatge 'start' o 'stop' al servidor
+// Funció per engegar o aturar el joc
 function startStop(): void {
-  // Verificar que hi ha connexió amb el servidor
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     alert("Error: No s'ha pogut establir connexió amb el servidor.");
     return;
   }
 
-  // Obtenir el botó i determinar l'acció segons el seu text actual
   const boto = document.getElementById("engegar") as HTMLButtonElement;
   const esEngegar = boto.textContent === "Engegar";
 
-  // Enviar missatge al servidor
   ws.send(
     JSON.stringify({
       type: esEngegar ? "start" : "stop",
     })
   );
 
-  // Registrar l'acció per consola
   console.log(
     `S'ha enviat l'ordre de ${esEngegar ? "engegar" : "aturar"} el joc`
   );
 }
 
-// Establir la connexió amb el servidor en el port 8180
-//	S'ha poder accedir utilitzant localhost o una adreça IP local
-// Gestionar esdeveniments de la connexió
-//	- a l'establir la connexió (open): enviar missatge al servidor indicant que s'ha d'afegir l'administrador
-//	- si es tanca la connexió (close): informar amb alert() i tornar a la pàgina principal (index.html)
-//	- en cas d'error: mostrar l'error amb alert() i tornar a la pàgina principal (index.html)
-//	- quan arriba un missatge (tipus de missatge):
-//		- configurar: cridar la funció configurar() passant-li les dades de configuració
-//			i actualitzar els valors dels inputs 'width', 'height' i 'pisos'
-//		- dibuixar: cridar la funció dibuixar() passant-li les dades per dibuixar jugadors, pedres i piràmides (punts)
-//		- engegar: canviar el text del botó 'Engegar' per 'Aturar'
-//		- aturar: canviar el text del botó 'Aturar' per 'Engegar'
-//		- missatge: mostrar el missatge per consola
+// Funció d'inicialització
 function init(): void {
-  // Estableix connexió WebSocket amb el servidor al port 8180
+  // Establiment de la connexió WebSocket
   ws = new WebSocket("ws://localhost:8180");
 
-  // Quan s'estableix la connexió, envia missatge identificant-se com a administrador
+  // Gestió de l'obertura de la connexió
   ws.onopen = function (): void {
     console.log("Connexió establerta amb el servidor");
     ws.send(JSON.stringify({ type: "admin" }));
   };
 
-  // Gestió dels missatges rebuts del servidor
+  // Gestió dels missatges rebuts
   ws.onmessage = function (event: MessageEvent): void {
     let message: WebSocketMessage;
     try {
       message = JSON.parse(event.data);
       console.log("📩 Missatge rebut:", message);
     } catch (error) {
-      // Mostrar l'error
       console.error("❌ Error parsejant missatge:", error);
       return;
     }
 
-    // Gestiona els diferents tipus de missatges
+    // Gestió dels diferents tipus de missatges
     switch (message.type) {
       case "config":
-        // Actualitza els camps del formulari amb la configuració rebuda
         if ("data" in message) {
           (document.getElementById("width") as HTMLInputElement).value =
             message.data.width.toString();
           (document.getElementById("height") as HTMLInputElement).value =
             message.data.height.toString();
 
-          // Eliminar el campo de pisos si existe
           const pisosInput = document.getElementById(
             "pisos"
           ) as HTMLInputElement;
           if (pisosInput) {
-            // Ocultar el campo de pisos
             const pisosContainer = pisosInput.parentElement;
             if (pisosContainer) {
               pisosContainer.style.display = "none";
             }
           }
 
-          // Actualizar el campo de límite de puntuación si existe
           const scoreLimitInput = document.getElementById(
             "scoreLimit"
           ) as HTMLInputElement;
@@ -202,35 +171,26 @@ function init(): void {
             scoreLimitInput.value = message.data.scoreLimit.toString();
           }
 
-          // También actualizar la configuración visual
           configurar(message.data);
         }
         break;
       case "engegar":
-        // Canvia el text del botó a 'Aturar' quan el joc s'engega
         (document.getElementById("engegar") as HTMLButtonElement).textContent =
           "Aturar";
         break;
       case "aturar":
-        // Canvia el text del botó a 'Engegar' quan el joc s'atura
         (document.getElementById("engegar") as HTMLButtonElement).textContent =
           "Engegar";
-
-        // Detener el temporizador cuando se detiene el juego
         detenerTemporizador();
         break;
       case "timeUpdate":
-        // Añadimos el procesamiento de los mensajes de actualización de tiempo
         const timeUpdateMsg = message as TimeUpdateMessage;
         console.log(
           `⏱️ Tiempo restante: ${timeUpdateMsg.remainingTime} segundos`
         );
-
-        // Actualizar el temporizador con el tiempo recibido
         actualizarTemporizador(timeUpdateMsg.remainingTime);
         break;
       case "starCollision":
-        // Registrar cuando un jugador recoge una estrella
         if ("jugadorId" in message && "nuevaPuntuacion" in message) {
           console.log(
             `⭐ Jugador ${message.jugadorId} ha recogido una estrella. Nueva puntuación: ${message.nuevaPuntuacion}`
@@ -238,22 +198,19 @@ function init(): void {
         }
         break;
       case "dibuixar":
-        // Registra l'estat actual del joc i actualitza el dibuix
         const gameState = message as GameStateMessage;
         console.log("🎨 Actualitzant estat del joc:", {
           jugadors: gameState.jugadors?.length || 0,
           pedres: gameState.pedres?.length || 0,
         });
-
         dibuixar(gameState.jugadors || [], gameState.pedres || []);
         break;
       default:
-        // Mostra per consola el missatge
         console.log("Missatge rebut:", message);
     }
   };
 
-  // Gestión de errores y cierre de conexión
+  // Gestió d'errors i tancament de connexió
   ws.onclose = function (): void {
     alert("La connexió amb el servidor s'ha tancat.");
     window.location.href = "index.html";
@@ -265,13 +222,9 @@ function init(): void {
     window.location.href = "index.html";
   };
 
-  // Gestors d'esdeveniments
+  // Assignació d'esdeveniments
   document.getElementById("configurar")?.addEventListener("click", setConfig);
   document.getElementById("engegar")?.addEventListener("click", startStop);
 }
-
-/***********************************************
- * FINAL DE L'APARTAT ON POTS FER MODIFICACIONS *
- ***********************************************/
 
 window.onload = init;

@@ -1,6 +1,4 @@
-/**
- * Servidor WebSocket para comunicación en tiempo real
- */
+// Servidor WebSocket per a comunicació en temps real
 
 const WebSocket = require("ws");
 const gameConfig = require("../config/game-config");
@@ -11,7 +9,7 @@ const gameManager = require("../game/game-manager");
 let wss = null;
 let adminWs = null;
 
-// Configurar los callbacks del gestor de estrellas
+// Configuració dels callbacks del gestor d'estrelles
 starManager.onStarDisappear = (starId) => {
   broadcastToAll({
     type: "starDisappear",
@@ -23,7 +21,7 @@ starManager.onStarsUpdated = () => {
   sendGameState();
 };
 
-// Configurar los callbacks del gestor del juego
+// Configuració dels callbacks del gestor del joc
 gameManager.setCallbacks({
   onGameUpdate: sendGameState,
 
@@ -53,7 +51,7 @@ gameManager.setCallbacks({
   },
 });
 
-// Manejador para cuando un cliente envía un mensaje
+// Manejador per quan un client envia un missatge
 gameManager.onStarCollision = (playerId, starId, newScore, newStar) => {
   broadcastToAll({
     type: "starCollision",
@@ -64,7 +62,7 @@ gameManager.onStarCollision = (playerId, starId, newScore, newStar) => {
   });
 };
 
-// Función para enviar mensaje a todos los clientes conectados
+// Envia missatges a tots els clients connectats
 function broadcastToAll(message) {
   if (!wss) return;
 
@@ -75,7 +73,7 @@ function broadcastToAll(message) {
   });
 }
 
-// Función para enviar el estado actual del juego
+// Envia l'estat actual del joc a tots els clients
 function sendGameState() {
   broadcastToAll({
     type: "dibuixar",
@@ -85,7 +83,7 @@ function sendGameState() {
   });
 }
 
-// Procesa los mensajes recibidos de los clientes
+// Processa els missatges dels clients
 function processMessage(ws, message) {
   try {
     const data = JSON.parse(message);
@@ -124,9 +122,8 @@ function processMessage(ws, message) {
   }
 }
 
-// Función para manejar la solicitud de administrador
+// Gestiona les sol·licituds d'administrador
 function handleAdminRequest(ws) {
-  // Comprobar si ya existe un administrador
   if (adminWs !== null) {
     ws.send(
       JSON.stringify({
@@ -137,11 +134,9 @@ function handleAdminRequest(ws) {
     return;
   }
 
-  // Establecer como administrador
   adminWs = ws;
   console.log("Administrador creado");
 
-  // Enviar configuración actual
   ws.send(
     JSON.stringify({
       type: "config",
@@ -150,9 +145,8 @@ function handleAdminRequest(ws) {
   );
 }
 
-// Función para manejar la solicitud de jugador
+// Gestiona les sol·licituds de nou jugador
 function handlePlayerRequest(ws) {
-  // Verificar si el juego está en marcha
   if (gameManager.isGameRunning()) {
     ws.send(
       JSON.stringify({
@@ -163,11 +157,9 @@ function handlePlayerRequest(ws) {
     return;
   }
 
-  // Crear jugador
   const player = playerManager.createPlayer(ws);
   console.log(`Nuevo jugador conectado con ID: ${player.id}`);
 
-  // Enviar identificador y configuración
   ws.send(
     JSON.stringify({
       type: "connectat",
@@ -176,13 +168,11 @@ function handlePlayerRequest(ws) {
     })
   );
 
-  // Enviar estado actual del juego
   sendGameState();
 }
 
-// Función para manejar la solicitud de configuración
+// Gestiona les sol·licituds de canvi de configuració
 function handleConfigRequest(ws, data) {
-  // Verificar que es el administrador
   if (ws !== adminWs) {
     ws.send(
       JSON.stringify({
@@ -193,7 +183,6 @@ function handleConfigRequest(ws, data) {
     return;
   }
 
-  // Verificar que el juego no está en marcha
   if (gameManager.isGameRunning()) {
     ws.send(
       JSON.stringify({
@@ -204,7 +193,6 @@ function handleConfigRequest(ws, data) {
     return;
   }
 
-  // Actualizar configuración
   const success = gameConfig.updateConfig(data.data);
   if (!success) {
     ws.send(
@@ -216,10 +204,8 @@ function handleConfigRequest(ws, data) {
     return;
   }
 
-  // Reiniciar jugadores
   playerManager.resetPlayers();
 
-  // Enviar nueva configuración a todos los clientes
   broadcastToAll({
     type: "config",
     data: gameConfig.getConfig(),
@@ -228,9 +214,8 @@ function handleConfigRequest(ws, data) {
   sendGameState();
 }
 
-// Función para manejar la solicitud de inicio de juego
+// Gestiona les sol·licituds d'inici de joc
 function handleStartRequest(ws) {
-  // Verificar que es el administrador
   if (ws !== adminWs) {
     ws.send(
       JSON.stringify({
@@ -241,7 +226,6 @@ function handleStartRequest(ws) {
     return;
   }
 
-  // Iniciar el juego
   if (gameManager.isGameRunning()) {
     ws.send(
       JSON.stringify({
@@ -252,16 +236,13 @@ function handleStartRequest(ws) {
     return;
   }
 
-  // Iniciar el juego
   gameManager.startGame();
 
-  // Notificar a todos los clientes
   broadcastToAll({ type: "engegar" });
 }
 
-// Función para manejar la solicitud de detener el juego
+// Gestiona les sol·licituds d'aturada de joc
 function handleStopRequest(ws) {
-  // Verificar que es el administrador
   if (ws !== adminWs) {
     ws.send(
       JSON.stringify({
@@ -272,7 +253,6 @@ function handleStopRequest(ws) {
     return;
   }
 
-  // Detener el juego
   if (!gameManager.isGameRunning()) {
     ws.send(
       JSON.stringify({
@@ -283,36 +263,30 @@ function handleStopRequest(ws) {
     return;
   }
 
-  // Detener el juego
   gameManager.stopGame();
 
-  // Notificar a todos los clientes
   broadcastToAll({ type: "aturar" });
 }
 
-// Función para manejar la actualización de dirección
+// Actualitza la direcció d'un jugador
 function handleDirectionUpdate(ws, data) {
-  // Verificar si el juego está en marcha
   if (!gameManager.isGameRunning()) return;
 
-  // Actualizar dirección del jugador
   playerManager.updatePlayerDirection(data.id, data.direction, data.angle);
 }
 
-// Función para manejar la solicitud de recoger/dejar piedra
+// Gestiona la sol·licitud de recollir/deixar pedra
 function handlePickupRequest(ws, data) {
-  // No implementado en esta versión ya que el juego de estrellas no usa ese mecanismo
   console.log("Función 'agafar' no implementada en esta versión");
 }
 
-// Función para manejar la colisión con una estrella
+// Gestiona la col·lisió amb una estrella
 function handleStarCollision(data) {
   gameManager.handleStarCollision(data.jugadorId, data.estrellaId);
 }
 
-// Función para manejar el cierre de conexión de un cliente
+// Gestiona la desconnexió d'un client
 function handleClientDisconnect(ws) {
-  // Comprobar si el cliente es un jugador
   const player = playerManager.getPlayerByWs(ws);
   if (player) {
     console.log(`Cliente desconectado (ID: ${player.id})`);
@@ -320,7 +294,6 @@ function handleClientDisconnect(ws) {
     sendGameState();
   }
 
-  // Comprobar si el cliente es el administrador
   if (ws === adminWs) {
     console.log("Administrador desconectado");
     adminWs = null;
@@ -334,7 +307,6 @@ module.exports = {
     wss.on("connection", function connection(ws) {
       console.log("Nuevo cliente conectado");
 
-      // Enviar configuración inicial
       ws.send(
         JSON.stringify({
           type: "config",
@@ -342,17 +314,14 @@ module.exports = {
         })
       );
 
-      // Gestionar mensajes entrantes
       ws.on("message", function incoming(message) {
         processMessage(ws, message);
       });
 
-      // Gestionar desconexiones
       ws.on("close", function close() {
         handleClientDisconnect(ws);
       });
 
-      // Gestionar errores
       ws.on("error", function error(err) {
         console.error("Error en la conexión WebSocket:", err);
       });
