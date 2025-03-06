@@ -339,7 +339,7 @@ StarsHunters/
 │       └── helpers.js           # Funcions auxiliars
 │
 ├── css/                         # Fitxers d'estil
-│   └── pyramid.css              # Estils principals
+│   └── styles.css               # Estils principals
 │
 ├── img/                         # Imatges del joc
 │   ├── nau3.svg                 # Nau del jugador actual
