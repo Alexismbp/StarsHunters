@@ -2,8 +2,6 @@
 
 Stars Hunters és un joc multijugador desenvolupat amb TypeScript on els jugadors controlen naus espacials per recollir estrelles en un entorn competitiu. El joc utilitza WebSockets per a la comunicació en temps real entre jugadors i el servidor, proporcionant una experiència fluida i dinàmica.
 
-![Stars Hunters Game](screenshots/game.png)
-
 ## 📋 Contingut
 
 - [🌟 Stars Hunters](#-stars-hunters)
@@ -31,6 +29,7 @@ Stars Hunters és un joc multijugador desenvolupat amb TypeScript on els jugador
     - [Compilació Automàtica](#compilació-automàtica)
     - [Debugging](#debugging)
   - [🛠️ Tecnologies Utilitzades](#️-tecnologies-utilitzades)
+  - [📝 Notes Addicionals](#-notes-addicionals)
   - [🤝 Contribució](#-contribució)
     - [Àrees de Millora Potencial](#àrees-de-millora-potencial)
   - [📄 Llicència](#-llicència)
@@ -186,7 +185,7 @@ El joc combina elements d'estratègia i reflexos ràpids, ja que els jugadors ha
 1. Clona aquest repositori a la teva carpeta XAMPP htdocs:
 
    ```bash
-   git clone <url-repositori> /Applications/XAMPP/xamppfiles/htdocs/Practiques/M12-Projecte/StarsHunters
+   git clone git clone https://github.com/Alexismbp/StarsHunters.git
    ```
 
 2. Navega al directori del projecte:
@@ -207,12 +206,6 @@ El joc combina elements d'estratègia i reflexos ràpids, ja que els jugadors ha
    npm run build
    ```
 
-   També pots usar l'script proporcionat:
-
-   ```bash
-   ./compile.sh
-   ```
-
 ## 🚀 Execució
 
 1. Inicia XAMPP:
@@ -222,8 +215,10 @@ El joc combina elements d'estratègia i reflexos ràpids, ja que els jugadors ha
 
 2. Inicia el servidor WebSocket:
 
+   Alternativament, pots utilitzar l'script d'inici inclòs:
+
    ```bash
-   node server/index.js
+   node start-server.js
    ```
 
    Hauries de veure missatges que confirmen que:
@@ -423,6 +418,18 @@ Per depurar el codi:
 - **HTML5/CSS3**: Estructura i estil de la interfície d'usuari
 - **npm**: Gestió de dependències
 - **ws**: Biblioteca WebSocket per a Node.js
+
+## 📝 Notes Addicionals
+
+- **Resolució de problemes coneguts**:
+
+  - Si experimentes latència en el moviment, verifica la teva connexió de xarxa
+  - En cas de problemes de connexió WebSocket, comprova que el port 8180 no estigui bloquejat pel tallafoc
+  - Si les imatges no es carreguen correctament, verifica que els fitxers SVG estiguin presents a la carpeta `img/`
+
+- **Requisits del sistema**:
+  - Es recomana un navegador actualitzat (Chrome 80+, Firefox 75+, Safari 13+, Edge 80+)
+  - Resolució mínima de pantalla recomanada: 1024x768 píxels
 
 ## 🤝 Contribució
 
