@@ -5,12 +5,14 @@ const httpServer = require("./networking/http-server");
 const websocketServer = require("./networking/websocket-server");
 const gameConfig = require("./config/game-config");
 
-// Usar el puerto proporcionado por Render o uno por defecto
-const PORT = process.env.PORT || 8080;
+// Modifica esta parte
+
+// Usar EXACTAMENTE el puerto proporcionado por Render
+const PORT = parseInt(process.env.PORT || "8080");
 
 // Crear servidor HTTP
 const server = httpServer.start(PORT);
-console.log(`Servidor HTTP escuchando en el puerto ${PORT}`);
+console.log(`Servidor HTTP escuchando en http://0.0.0.0:${PORT}`);
 
 // Iniciar servidor WebSocket usando el mismo servidor HTTP
 websocketServer.start(server);
