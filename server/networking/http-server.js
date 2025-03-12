@@ -94,7 +94,9 @@ module.exports = {
   start: (port) => {
     const server = http.createServer();
     server.on("request", onRequest);
-    server.listen(port);
+    server.listen(port, "0.0.0.0", () => {
+      console.log(`Servidor HTTP escuchando en http://0.0.0.0:${port}`);
+    });
     return server;
   },
 };
