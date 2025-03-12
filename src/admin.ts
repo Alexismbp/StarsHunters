@@ -126,7 +126,7 @@ function startStop(): void {
 // Funció d'inicialització
 function init(): void {
   // Establiment de la connexió WebSocket
-  const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
   const host = window.location.host;
   ws = new WebSocket(`${protocol}${host}/ws`);
 
@@ -206,6 +206,19 @@ function init(): void {
           pedres: gameState.pedres?.length || 0,
         });
         dibuixar(gameState.jugadors || [], gameState.pedres || []);
+        break;
+      case "ganador":
+        console.log(`🏆 Jugador ${message.id} ha guanyat!`);
+        // Actualizar botón para permitir reiniciar
+        (document.getElementById("engegar") as HTMLButtonElement).textContent =
+          "Engegar";
+        break;
+      case "timeUp":
+        console.log("⏰ Tiempo agotado, fin del juego");
+        // Actualizar botón para permitir reiniciar
+        (document.getElementById("engegar") as HTMLButtonElement).textContent =
+          "Engegar";
+        detenerTemporizador();
         break;
       default:
         console.log("Missatge rebut:", message);

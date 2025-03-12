@@ -363,6 +363,76 @@ function init(): void {
 
         case "ganador":
           const winnerMsg = message as WinnerMessage;
+          import("./pyramid.js").then((module) => {
+            module.detenerTemporizador();
+            // Mostrar mensaje de ganador
+            const svg = document.querySelector("svg") as SVGSVGElement;
+            const winnerDisplay = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "g"
+            );
+            winnerDisplay.setAttribute("id", "winner-display");
+
+            // Fondo semitransparente
+            const rect = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "rect"
+            );
+            rect.setAttribute("x", "0");
+            rect.setAttribute("y", "0");
+            rect.setAttribute("width", svg.getAttribute("width") || "800");
+            rect.setAttribute("height", svg.getAttribute("height") || "600");
+            rect.setAttribute("fill", "rgba(0,0,0,0.7)");
+            winnerDisplay.appendChild(rect);
+
+            // Texto de ganador
+            const text = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text"
+            );
+            text.setAttribute(
+              "x",
+              (parseInt(svg.getAttribute("width") || "800") / 2).toString()
+            );
+            text.setAttribute(
+              "y",
+              (parseInt(svg.getAttribute("height") || "600") / 2).toString()
+            );
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("font-size", "48");
+            text.setAttribute("fill", "#ffffff");
+            text.textContent = `¡Jugador ${winnerMsg.id} GANA!`;
+            winnerDisplay.appendChild(text);
+
+            const subText = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text"
+            );
+            subText.setAttribute(
+              "x",
+              (parseInt(svg.getAttribute("width") || "800") / 2).toString()
+            );
+            subText.setAttribute(
+              "y",
+              (
+                parseInt(svg.getAttribute("height") || "600") / 2 +
+                60
+              ).toString()
+            );
+            subText.setAttribute("text-anchor", "middle");
+            subText.setAttribute("font-size", "24");
+            subText.setAttribute("fill", "#FFFFFF");
+            subText.textContent = "¡Ha alcanzado el límite de puntuación!";
+            winnerDisplay.appendChild(subText);
+
+            // Eliminar cualquier mensaje de ganador existente
+            const oldWinner = svg.getElementById("winner-display");
+            if (oldWinner) {
+              svg.removeChild(oldWinner);
+            }
+
+            svg.appendChild(winnerDisplay);
+          });
           break;
 
         case "engegar":
@@ -412,6 +482,81 @@ function init(): void {
 
         case "timeUp":
           const timeUpMsg = message as TimeUpMessage;
+          import("./pyramid.js").then((module) => {
+            module.detenerTemporizador();
+
+            if (timeUpMsg.empate) {
+              module.mostrarEmpate(timeUpMsg.maximaPuntuacion);
+            } else if (timeUpMsg.ganadorId !== null) {
+              const svg = document.querySelector("svg") as SVGSVGElement;
+              const winnerDisplay = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "g"
+              );
+              winnerDisplay.setAttribute("id", "winner-display");
+
+              // Fondo semitransparente
+              const rect = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "rect"
+              );
+              rect.setAttribute("x", "0");
+              rect.setAttribute("y", "0");
+              rect.setAttribute("width", svg.getAttribute("width") || "800");
+              rect.setAttribute("height", svg.getAttribute("height") || "600");
+              rect.setAttribute("fill", "rgba(0,0,0,0.7)");
+              winnerDisplay.appendChild(rect);
+
+              // Texto de ganador
+              const text = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "text"
+              );
+              text.setAttribute(
+                "x",
+                (parseInt(svg.getAttribute("width") || "800") / 2).toString()
+              );
+              text.setAttribute(
+                "y",
+                (parseInt(svg.getAttribute("height") || "600") / 2).toString()
+              );
+              text.setAttribute("text-anchor", "middle");
+              text.setAttribute("font-size", "48");
+              text.setAttribute("fill", "#ffffff");
+              text.textContent = `¡Jugador ${timeUpMsg.ganadorId} GANA!`;
+              winnerDisplay.appendChild(text);
+
+              const subText = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "text"
+              );
+              subText.setAttribute(
+                "x",
+                (parseInt(svg.getAttribute("width") || "800") / 2).toString()
+              );
+              subText.setAttribute(
+                "y",
+                (
+                  parseInt(svg.getAttribute("height") || "600") / 2 +
+                  60
+                ).toString()
+              );
+              subText.setAttribute("text-anchor", "middle");
+              subText.setAttribute("font-size", "24");
+              subText.setAttribute("fill", "#FFFFFF");
+              subText.textContent =
+                "¡Tenía la mayor puntuación al acabar el tiempo!";
+              winnerDisplay.appendChild(subText);
+
+              // Eliminar cualquier mensaje de ganador existente
+              const oldWinner = svg.getElementById("winner-display");
+              if (oldWinner) {
+                svg.removeChild(oldWinner);
+              }
+
+              svg.appendChild(winnerDisplay);
+            }
+          });
           break;
 
         case "starDisappear":

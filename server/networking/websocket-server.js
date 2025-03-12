@@ -45,6 +45,7 @@ gameManager.setCallbacks({
       broadcastToAll({
         type: "timeUp",
         empate: true,
+        ganadorId: null,
         maximaPuntuacion: result.maximaPuntuacion,
       });
     }

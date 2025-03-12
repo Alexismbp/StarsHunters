@@ -144,7 +144,7 @@ function imageSVG(
 }
 
 // Mostra el guanyador a la pantalla
-function mostrarGanador(jugadorId: string | number): void {
+function mostrarGanador(jugadorId: string | number, message?: string): void {
   winner = jugadorId;
   const svg = document.querySelector("svg") as SVGSVGElement;
 
@@ -182,7 +182,49 @@ function mostrarGanador(jugadorId: string | number): void {
   subText.setAttribute("text-anchor", "middle");
   subText.setAttribute("font-size", "24");
   subText.setAttribute("fill", "#FFFFFF");
-  subText.textContent = "¡Ha alcanzado el límite de puntuación!";
+  subText.textContent = message || "¡Ha alcanzado el límite de puntuación!";
+  winnerDisplay.appendChild(subText);
+}
+
+// Muestra pantalla de empate
+export function mostrarEmpate(maxScore: number): void {
+  const svg = document.querySelector("svg") as SVGSVGElement;
+
+  let winnerDisplay = svg.getElementById("winner-display");
+  if (!winnerDisplay) {
+    winnerDisplay = document.createElementNS(svgNS, "g");
+    winnerDisplay.setAttribute("id", "winner-display");
+    svg.appendChild(winnerDisplay);
+  } else {
+    while (winnerDisplay.firstChild) {
+      winnerDisplay.removeChild(winnerDisplay.firstChild);
+    }
+  }
+
+  const rect = document.createElementNS(svgNS, "rect");
+  rect.setAttribute("x", "0");
+  rect.setAttribute("y", "0");
+  rect.setAttribute("width", config.width.toString());
+  rect.setAttribute("height", config.height.toString());
+  rect.setAttribute("fill", "rgba(0,0,0,0.7)");
+  winnerDisplay.appendChild(rect);
+
+  const text = document.createElementNS(svgNS, "text");
+  text.setAttribute("x", (config.width / 2).toString());
+  text.setAttribute("y", (config.height / 2).toString());
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("font-size", "48");
+  text.setAttribute("fill", "#ffffff");
+  text.textContent = "¡EMPATE!";
+  winnerDisplay.appendChild(text);
+
+  const subText = document.createElementNS(svgNS, "text");
+  subText.setAttribute("x", (config.width / 2).toString());
+  subText.setAttribute("y", (config.height / 2 + 60).toString());
+  subText.setAttribute("text-anchor", "middle");
+  subText.setAttribute("font-size", "24");
+  subText.setAttribute("fill", "#FFFFFF");
+  subText.textContent = `Puntuación máxima: ${maxScore}`;
   winnerDisplay.appendChild(subText);
 }
 
@@ -406,10 +448,12 @@ export function dibuixar(jugadors: Jugador[], pedres: Pedra[]): void {
     mostrarTemporizador();
   }
 
-  const ganador = jugadors.find((j) => j.puntuacion >= config.scoreLimit);
-  if (ganador) {
-    mostrarGanador(ganador.id);
-    detenerTemporizador();
+  if (!winner) {
+    const ganador = jugadors.find((j) => j.puntuacion >= config.scoreLimit);
+    if (ganador) {
+      mostrarGanador(ganador.id);
+      detenerTemporizador();
+    }
   }
 }
 
