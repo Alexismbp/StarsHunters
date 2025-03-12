@@ -301,9 +301,21 @@ function handleClientDisconnect(ws) {
 }
 
 module.exports = {
-  start: (port) => {
-    wss = new WebSocket.Server({ port });
+  start: (server) => {
+    // Si recibimos un número, creamos un servidor independiente (para desarrollo)
+    // Si recibimos un servidor HTTP, lo usamos (para producción)
+    if (typeof server === "number") {
+      wss = new WebSocket.Server({ port: server });
+      console.log(`WebSocket creado en puerto independiente: ${server}`);
+    } else {
+      wss = new WebSocket.Server({
+        server: server,
+        path: "/ws", // Ruta específica para WebSockets
+      });
+      console.log("WebSocket integrado con servidor HTTP");
+    }
 
+    // El resto del código se mantiene igual...
     wss.on("connection", function connection(ws) {
       console.log("Nuevo cliente conectado");
 

@@ -126,7 +126,9 @@ function startStop(): void {
 // Funció d'inicialització
 function init(): void {
   // Establiment de la connexió WebSocket
-  ws = new WebSocket("ws://localhost:8180");
+  const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const host = window.location.host;
+  ws = new WebSocket(`${protocol}${host}/ws`);
 
   // Gestió de l'obertura de la connexió
   ws.onopen = function (): void {

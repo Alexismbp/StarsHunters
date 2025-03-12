@@ -257,7 +257,9 @@ function direccio(ev: KeyboardEvent): void {
 
 // Inicialitza la connexió amb el servidor
 function init(): void {
-  ws = new WebSocket("ws://localhost:8180");
+  const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+  const host = window.location.host;
+  ws = new WebSocket(`${protocol}${host}/ws`);
 
   ws.onopen = function (): void {
     if (ws) {
